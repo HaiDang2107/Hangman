@@ -1,0 +1,5 @@
+user1 pass1 10 2000
+user2 pass2 5 900
+user3 pass3 15 3000
+user4 pass4 2 450
+user5 pass5 8 1500

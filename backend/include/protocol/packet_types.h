@@ -11,6 +11,7 @@ constexpr uint8_t PROTOCOL_VERSION = 1;
 
 // Maxs
 constexpr size_t MAX_USERNAME_LEN = 64;
+constexpr size_t MAX_PASSWORD_LEN = 64;
 constexpr size_t MAX_TOKEN_LEN = 256;
 constexpr size_t MAX_MESSAGE_LEN = 1024;
 constexpr size_t MAX_ROOM_NAME_LEN = 128;

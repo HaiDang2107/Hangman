@@ -12,7 +12,7 @@ namespace hangman {
 
 class ByteBuffer {
 public:
-    std::vector<uint8_t> buf;
+    std::vector<uint8_t> buf; // payload may be large ==> use vector instead of array + many datatype 
     size_t rpos = 0;
 
     ByteBuffer() = default;

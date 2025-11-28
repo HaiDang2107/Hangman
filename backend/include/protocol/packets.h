@@ -60,6 +60,8 @@ struct S2C_LoginResult {
     ResultCode code;
     std::string message;
     std::string session_token; // if OK
+    uint16_t num_of_wins;
+    uint16_t total_points;
     std::vector<uint8_t> to_bytes() const;
     static S2C_LoginResult from_payload(ByteBuffer& bb);
 };

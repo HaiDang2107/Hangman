@@ -8,7 +8,7 @@
 #include <cstring>
 
 int Socket::createListeningSocket(int port) {
-    // Tạo socket
+    // Create socket
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) {
         throw std::runtime_error("Failed to create socket");

@@ -57,6 +57,8 @@ namespace hangman
         bb.write_u8(static_cast<uint8_t>(code));
         bb.write_string(message);
         bb.write_string(session_token);
+        bb.write_u16(num_of_wins);
+        bb.write_u16(total_points);
 
         std::vector<uint8_t> header_bytes =
             PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::S2C_LoginResult, bb.size());
@@ -71,6 +73,8 @@ namespace hangman
         packet.code = static_cast<ResultCode>(bb.read_u8());
         packet.message = bb.read_string();
         packet.session_token = bb.read_string();
+        packet.num_of_wins = bb.read_u16();
+        packet.total_points = bb.read_u16();
         return packet;
     }
 
@@ -123,13 +127,54 @@ namespace hangman
     }
 
     // =====================================================
+    //                    C2S_Logout
+    // =====================================================
+    std::vector<uint8_t> C2S_Logout::to_bytes() const
+    {
+        ByteBuffer bb;
+        bb.write_string(session_token);
+
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::C2S_Logout, bb.size());
+
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+
+    C2S_Logout C2S_Logout::from_payload(ByteBuffer &bb)
+    {
+        C2S_Logout packet;
+        packet.session_token = bb.read_string();
+        return packet;
+    }
+
+    // =====================================================
+    //                   S2C_LogoutAck
+    // =====================================================
+    std::vector<uint8_t> S2C_LogoutAck::to_bytes() const
+    {
+        ByteBuffer bb;
+        bb.write_u8(static_cast<uint8_t>(code));
+        bb.write_string(message);
+
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::S2C_LogoutAck, bb.size());
+
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+
+    S2C_LogoutAck S2C_LogoutAck::from_payload(ByteBuffer &bb)
+    {
+        S2C_LogoutAck packet;
+        packet.code = static_cast<ResultCode>(bb.read_u8());
+        packet.message = bb.read_string();
+        return packet;
+    }
+
+    // =====================================================
     //         ALL REMAINING PACKETS (Not Implemented)
     // =====================================================
-    std::vector<uint8_t> C2S_Logout::to_bytes() const { throw std::runtime_error("Not implemented"); }
-    C2S_Logout C2S_Logout::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }
-
-    std::vector<uint8_t> S2C_LogoutAck::to_bytes() const { throw std::runtime_error("Not implemented"); }
-    S2C_LogoutAck S2C_LogoutAck::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }
 
     std::vector<uint8_t> C2S_CreateRoom::to_bytes() const { throw std::runtime_error("Not implemented"); }
     C2S_CreateRoom C2S_CreateRoom::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }

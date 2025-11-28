@@ -1,31 +1,57 @@
-CXX = g++
-CXXFLAGS = -std=c++17 -I./include -pthread -Wall -Wextra
-LDFLAGS =
+# Compiler settings
+CXX      := g++
+CXXFLAGS := -Wall -Wextra -std=c++17 -Iinclude -g
+LDFLAGS  := -pthread
 
-# Source files
-SOURCES = \
-	src/main.cpp \
-	src/network/Socket.cpp \
-	src/network/EventLoop.cpp \
-	src/network/Connection.cpp \
-	src/network/Server.cpp \
-	src/threading/TaskQueue.cpp \
-	src/threading/CallbackQueue.cpp \
-	src/threading/Task.cpp \
-	src/protocol/packets.cpp
+# Directory structure
+SRC_DIR   := src
+BUILD_DIR := build
+BIN_NAME  := server
+TEST_BIN  := test_client
+TARGET    := $(BUILD_DIR)/$(BIN_NAME)
+TEST_TARGET := $(BUILD_DIR)/$(TEST_BIN)
 
-OBJECTS = $(SOURCES:.cpp=.o)
-EXECUTABLE = server
+# Auto-detect all .cpp files recursively in src/
+SRCS := $(shell find $(SRC_DIR) -name '*.cpp')
 
-all: $(EXECUTABLE)
+# Map source files to object files (src/%.cpp -> build/%.o)
+OBJS := $(SRCS:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/%.o)
 
-$(EXECUTABLE): $(OBJECTS)
-	$(CXX) $(CXXFLAGS) $(OBJECTS) -o $(EXECUTABLE) $(LDFLAGS)
+# Default target
+all: $(TARGET)
 
-%.o: %.cpp
+# Test target
+test: $(TEST_TARGET)
+
+# Linking: Create server executable from object files
+$(TARGET): $(OBJS)
+	@mkdir -p $(dir $@)
+	@echo "Linking: $@"
+	$(CXX) $(OBJS) -o $@ $(LDFLAGS)
+	@echo "Build complete! Run: ./$(TARGET)"
+
+# Linking: Create test client executable (needs protocol objects)
+$(TEST_TARGET): $(BUILD_DIR)/test_client.o $(BUILD_DIR)/protocol/packets.o
+	@mkdir -p $(dir $@)
+	@echo "Linking test client: $@"
+	$(CXX) $(BUILD_DIR)/test_client.o $(BUILD_DIR)/protocol/packets.o -o $@ $(LDFLAGS)
+	@echo "Test client built! Run: ./$(TEST_TARGET) [port]"
+
+# Compilation: Create .o files from .cpp files
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp
+	@mkdir -p $(dir $@)  # Create build sub-directories on the fly
+	@echo "Compiling: $<"
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-clean:
-	rm -f $(OBJECTS) $(EXECUTABLE)
+# Compilation: Create test client object file
+$(BUILD_DIR)/test_client.o: test_client.cpp
+	@mkdir -p $(dir $@)
+	@echo "Compiling: $<"
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-.PHONY: all clean
+# Cleanup
+clean:
+	@echo "Cleaning build directory..."
+	rm -rf $(BUILD_DIR)
+
+.PHONY: all test clean

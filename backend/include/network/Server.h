@@ -9,53 +9,60 @@
 #include <thread>
 #include <atomic>
 
-namespace hangman {
+namespace hangman
+{
 
-class Server {
-public:
-    explicit Server(int port);
-    ~Server();
+    class Server
+    {
+    public:
+        explicit Server(int port);
+        ~Server();
 
-    // Start the server (blocks until stopped)
-    void run();
+        // Initialize server (load database and prepare)
+        bool initialize(const std::string& dbPath = "database/account.txt");
 
-    // Stop the server
-    void stop();
+        // Start the server (blocks until stopped)
+        void run();
 
-    // Get server state
-    bool isRunning() const { return running; }
-    int getPort() const { return port; }
+        // Stop the server
+        void stop();
 
-private:
-    // Network thread handlers
-    void handleAccept();
-    void handleClientRead(int clientFd);
-    void handleClientWrite(int clientFd);
-    void handleCallbacks();
+        // Get server state
+        bool isRunning() const { return running; }
+        int getPort() const { return port; }
+        bool isInitialized() const { return initialized; }
 
-    // Worker thread main loop
-    void workerThreadLoop();
+    private:
+        // Network thread handlers
+        void handleAccept();
+        void handleClientRead(int clientFd);
+        void handleClientWrite(int clientFd);
+        void handleCallbacks();
 
-    // Helper methods
-    void processPacket(int clientFd, const uint8_t* data, size_t len);
-    void sendResponse(int clientFd, const std::vector<uint8_t>& packet);
+        // Worker thread main loop
+        void workerThreadLoop();
 
-    int port;
-    int listenFd;
-    std::atomic<bool> running;
+        // Helper methods
+        void processPacket(int clientFd, uint16_t packetType, const uint8_t *data, size_t len);
+        void sendResponse(int clientFd, const std::vector<uint8_t> &packet);
 
-    // Event loop for network I/O
-    std::unique_ptr<EventLoop> eventLoop;
+        int port;
+        int listenFd;
+        std::atomic<bool> running;
+        bool initialized = false;
 
-    // Connection management
-    std::map<int, ConnectionPtr> connections;
+        // Event loop for network I/O
+        std::unique_ptr<EventLoop> eventLoop;
 
-    // Task and callback queues
-    std::unique_ptr<TaskQueue> taskQueue;
-    std::unique_ptr<CallbackQueue> callbackQueue;
+        // Connection management
+        std::map<int, ConnectionPtr> connections;
 
-    // Worker thread
-    std::thread workerThread;
-};
+        // Task and callback queues
+        std::unique_ptr<TaskQueue> taskQueue;
+        std::unique_ptr<CallbackQueue> callbackQueue;
+
+        // Worker thread
+        std::thread workerThread;
+    };
 
 } // namespace hangman

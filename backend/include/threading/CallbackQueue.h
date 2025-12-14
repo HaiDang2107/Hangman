@@ -6,6 +6,18 @@
 #include <functional>
 #include <vector>
 
+// Worker Thread: Xử lý xong Task 
+// → Tạo FunctionCallback chứa logic gửi phản hồi 
+// → Gọi callbackQueue->push()
+
+// CallbackQueue: Đẩy vào hàng đợi 
+// → Ghi vào notifyFd.
+
+// Network Thread: Đang chờ ở epoll_wait 
+// → Bị đánh thức bởi notifyFd 
+// → Gọi callbackQueue->popAll() 
+// → Chạy callback->execute() để gửi dữ liệu cho client.
+
 namespace hangman {
 
 // Callback interface - used to pass results back from worker to network thread

@@ -173,20 +173,132 @@ namespace hangman
     }
 
     // =====================================================
+    //                    C2S_CreateRoom
+    // =====================================================
+    std::vector<uint8_t> C2S_CreateRoom::to_bytes() const
+    {
+        ByteBuffer bb;
+        bb.write_string(session_token);
+        bb.write_string(room_name);
+
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::C2S_CreateRoom, bb.size());
+
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+
+    C2S_CreateRoom C2S_CreateRoom::from_payload(ByteBuffer &bb)
+    {
+        C2S_CreateRoom packet;
+        packet.session_token = bb.read_string();
+        packet.room_name = bb.read_string();
+        return packet;
+    }
+
+    // =====================================================
+    //                S2C_CreateRoomResult
+    // =====================================================
+    std::vector<uint8_t> S2C_CreateRoomResult::to_bytes() const
+    {
+        ByteBuffer bb;
+        bb.write_u8(static_cast<uint8_t>(code));
+        bb.write_string(message);
+        bb.write_u32(room_id);
+
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::S2C_CreateRoomResult, bb.size());
+
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+
+    S2C_CreateRoomResult S2C_CreateRoomResult::from_payload(ByteBuffer &bb)
+    {
+        S2C_CreateRoomResult packet;
+        packet.code = static_cast<ResultCode>(bb.read_u8());
+        packet.message = bb.read_string();
+        packet.room_id = bb.read_u32();
+        return packet;
+    }
+
+    // =====================================================
+    //                    C2S_LeaveRoom
+    // =====================================================
+    std::vector<uint8_t> C2S_LeaveRoom::to_bytes() const
+    {
+        ByteBuffer bb;
+        bb.write_string(session_token);
+        bb.write_u32(room_id);
+
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::C2S_LeaveRoom, bb.size());
+
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+
+    C2S_LeaveRoom C2S_LeaveRoom::from_payload(ByteBuffer &bb)
+    {
+        C2S_LeaveRoom packet;
+        packet.session_token = bb.read_string();
+        packet.room_id = bb.read_u32();
+        return packet;
+    }
+
+    // =====================================================
+    //                   S2C_LeaveRoomAck
+    // =====================================================
+    std::vector<uint8_t> S2C_LeaveRoomAck::to_bytes() const
+    {
+        ByteBuffer bb;
+        bb.write_u8(static_cast<uint8_t>(code));
+        bb.write_string(message);
+
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::S2C_LeaveRoomAck, bb.size());
+
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+
+    S2C_LeaveRoomAck S2C_LeaveRoomAck::from_payload(ByteBuffer &bb)
+    {
+        S2C_LeaveRoomAck packet;
+        packet.code = static_cast<ResultCode>(bb.read_u8());
+        packet.message = bb.read_string();
+        return packet;
+    }
+
+    // =====================================================
+    //             S2C_PlayerLeftNotification
+    // =====================================================
+    std::vector<uint8_t> S2C_PlayerLeftNotification::to_bytes() const
+    {
+        ByteBuffer bb;
+        bb.write_string(username);
+        bb.write_u8(is_new_host ? 1 : 0);
+        bb.write_string(message);
+
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::S2C_PlayerLeftNotification, bb.size());
+
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+
+    S2C_PlayerLeftNotification S2C_PlayerLeftNotification::from_payload(ByteBuffer &bb)
+    {
+        S2C_PlayerLeftNotification packet;
+        packet.username = bb.read_string();
+        packet.is_new_host = (bb.read_u8() != 0);
+        packet.message = bb.read_string();
+        return packet;
+    }
+
+    // =====================================================
     //         ALL REMAINING PACKETS (Not Implemented)
     // =====================================================
-
-    std::vector<uint8_t> C2S_CreateRoom::to_bytes() const { throw std::runtime_error("Not implemented"); }
-    C2S_CreateRoom C2S_CreateRoom::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }
-
-    std::vector<uint8_t> S2C_CreateRoomResult::to_bytes() const { throw std::runtime_error("Not implemented"); }
-    S2C_CreateRoomResult S2C_CreateRoomResult::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }
-
-    std::vector<uint8_t> C2S_LeaveRoom::to_bytes() const { throw std::runtime_error("Not implemented"); }
-    C2S_LeaveRoom C2S_LeaveRoom::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }
-
-    std::vector<uint8_t> S2C_LeaveRoomAck::to_bytes() const { throw std::runtime_error("Not implemented"); }
-    S2C_LeaveRoomAck S2C_LeaveRoomAck::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }
 
     std::vector<uint8_t> C2S_RequestOnlineList::to_bytes() const { throw std::runtime_error("Not implemented"); }
     C2S_RequestOnlineList C2S_RequestOnlineList::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }

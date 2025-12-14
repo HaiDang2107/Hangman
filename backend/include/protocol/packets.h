@@ -90,14 +90,14 @@ struct C2S_CreateRoom {
 struct S2C_CreateRoomResult {
     ResultCode code;
     std::string message;
-    uint64_t room_id; // 0 means none
+    uint32_t room_id; // 0 means none
     std::vector<uint8_t> to_bytes() const;
     static S2C_CreateRoomResult from_payload(ByteBuffer& bb);
 };
 
 struct C2S_LeaveRoom {
     std::string session_token;
-    uint64_t room_id;
+    uint32_t room_id;
     std::vector<uint8_t> to_bytes() const;
     static C2S_LeaveRoom from_payload(ByteBuffer& bb);
 };
@@ -107,6 +107,14 @@ struct S2C_LeaveRoomAck {
     std::string message;
     std::vector<uint8_t> to_bytes() const;
     static S2C_LeaveRoomAck from_payload(ByteBuffer& bb);
+};
+
+struct S2C_PlayerLeftNotification {
+    std::string username; // Who left
+    bool is_new_host;     // Are you the new host?
+    std::string message;  // Notification message
+    std::vector<uint8_t> to_bytes() const;
+    static S2C_PlayerLeftNotification from_payload(ByteBuffer& bb);
 };
 
 struct C2S_RequestOnlineList {
@@ -126,13 +134,14 @@ struct S2C_OnlineList {
 struct C2S_SendInvite {
     std::string session_token;
     std::string target_username;
+    uint32_t room_id;
     std::vector<uint8_t> to_bytes() const;
     static C2S_SendInvite from_payload(ByteBuffer& bb);
 };
 
 struct S2C_InviteReceived {
     std::string from_username;
-    uint64_t room_id; // where match will occur (or 0)
+    uint32_t room_id; // where match will occur (or 0)
     std::vector<uint8_t> to_bytes() const;
     static S2C_InviteReceived from_payload(ByteBuffer& bb);
 };
@@ -141,7 +150,6 @@ struct C2S_RespondInvite {
     std::string session_token;
     std::string from_username;
     bool accept;
-    uint64_t room_id;
     std::vector<uint8_t> to_bytes() const;
     static C2S_RespondInvite from_payload(ByteBuffer& bb);
 };
@@ -157,7 +165,7 @@ struct S2C_InviteResponse {
 // Ready / start
 struct C2S_SetReady {
     std::string session_token;
-    uint64_t room_id;
+    uint32_t room_id;
     bool ready;
     std::vector<uint8_t> to_bytes() const;
     static C2S_SetReady from_payload(ByteBuffer& bb);
@@ -171,7 +179,7 @@ struct S2C_PlayerReadyUpdate {
 };
 
 struct S2C_GameStart {
-    uint64_t room_id;
+    uint32_t room_id;
     std::string opponent_username;
     uint32_t seed; // random seed for word selection (optional)
     std::vector<uint8_t> to_bytes() const;
@@ -181,7 +189,8 @@ struct S2C_GameStart {
 // Game actions
 struct C2S_GuessChar {
     std::string session_token;
-    uint64_t match_id;
+    uint32_t room_id;
+    uint32_t match_id;
     char ch;
     std::vector<uint8_t> to_bytes() const;
     static C2S_GuessChar from_payload(ByteBuffer& bb);
@@ -197,7 +206,8 @@ struct S2C_GuessCharResult {
 
 struct C2S_GuessWord {
     std::string session_token;
-    uint64_t match_id;
+    uint32_t room_id;
+    uint32_t match_id;
     std::string word;
     std::vector<uint8_t> to_bytes() const;
     static C2S_GuessWord from_payload(ByteBuffer& bb);
@@ -213,21 +223,23 @@ struct S2C_GuessWordResult {
 
 struct C2S_RequestDraw {
     std::string session_token;
-    uint64_t match_id;
+    uint32_t room_id;
+    uint32_t match_id;
     std::vector<uint8_t> to_bytes() const;
     static C2S_RequestDraw from_payload(ByteBuffer& bb);
 };
 
 struct S2C_DrawRequest {
     std::string from_username;
-    uint64_t match_id;
+    uint32_t match_id;
     std::vector<uint8_t> to_bytes() const;
     static S2C_DrawRequest from_payload(ByteBuffer& bb);
 };
 
 struct C2S_EndGame {
     std::string session_token;
-    uint64_t match_id;
+    uint32_t room_id;
+    uint32_t match_id;
     uint8_t result_code; // 0 = resignation, 1 = win, 2 = loss, 3 = draw
     std::string message;
     std::vector<uint8_t> to_bytes() const;
@@ -235,7 +247,7 @@ struct C2S_EndGame {
 };
 
 struct S2C_GameEnd {
-    uint64_t match_id;
+    uint32_t match_id;
     uint8_t result_code;
     std::string summary;
     std::vector<uint8_t> to_bytes() const;
@@ -252,10 +264,10 @@ struct C2S_RequestHistory {
 struct S2C_HistoryList {
     // simple entries: match_id, opponent, result_code, timestamp, summary
     struct Entry {
-        uint64_t match_id;
+        uint32_t match_id;
         std::string opponent;
         uint8_t result_code;
-        uint64_t timestamp;
+        uint32_t timestamp;
         std::string summary;
         void write(ByteBuffer& bb) const;
         static Entry read(ByteBuffer& bb);

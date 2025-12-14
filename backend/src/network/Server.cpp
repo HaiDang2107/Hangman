@@ -24,11 +24,11 @@ namespace hangman
         listenFd = Socket::createListeningSocket(port);
         std::cout << "Server listening on port " << port << std::endl;
 
-        // Register listen fd with event loop
+        // Register listening fd with event loop
         eventLoop->addFd(listenFd, [this]()
                          { handleAccept(); });
 
-        // Register callback queue notification fd (WAKE UP main thread when worker thread completed tasks)
+        // Register callback queue notification fd with event loop
         eventLoop->addFd(callbackQueue->getNotificationFd(), [this]()
                          { handleCallbacks(); });
     }
@@ -241,7 +241,7 @@ namespace hangman
             switch (packetType) {
                 case static_cast<uint16_t>(PacketType::C2S_Register): {
                     C2S_Register registerReq = C2S_Register::from_payload(buf);
-                    auto task = std::make_shared<RegisterTask>(clientFd, registerReq);
+                    auto task = std::make_shared<RegisterTask>(clientFd, registerReq); // Create a task (who, type)
                     taskQueue->push(task);
                     std::cout << "Queued RegisterTask for client " << clientFd << std::endl;
                     break;
@@ -263,6 +263,22 @@ namespace hangman
                     break;
                 }
 
+                case static_cast<uint16_t>(PacketType::C2S_CreateRoom): {
+                    C2S_CreateRoom createRoomReq = C2S_CreateRoom::from_payload(buf);
+                    auto task = std::make_shared<CreateRoomTask>(clientFd, createRoomReq);
+                    taskQueue->push(task);
+                    std::cout << "Queued CreateRoomTask for client " << clientFd << std::endl;
+                    break;
+                }
+
+                case static_cast<uint16_t>(PacketType::C2S_LeaveRoom): {
+                    C2S_LeaveRoom leaveRoomReq = C2S_LeaveRoom::from_payload(buf);
+                    auto task = std::make_shared<LeaveRoomTask>(clientFd, leaveRoomReq);
+                    taskQueue->push(task);
+                    std::cout << "Queued LeaveRoomTask for client " << clientFd << std::endl;
+                    break;
+                }
+
                 default:
                     std::cerr << "Unknown packet type: 0x" << std::hex << packetType << std::dec << std::endl;
                     break;
@@ -273,7 +289,7 @@ namespace hangman
             std::cerr << "Error processing packet: " << e.what() << std::endl;
         }
     }
-
+    // Send response được sử dụng bổi eventloop dưới sự hướng dẫn của workerthread
     void Server::sendResponse(int clientFd, const std::vector<uint8_t> &packet)
     {
         auto it = connections.find(clientFd);
@@ -284,9 +300,12 @@ namespace hangman
 
         try
         {
+            // Cố  gắng gửi dữ liệu ngay lập tức
+            // Nếu không thể gửi hết, dữ liệu sẽ được lưu vào bộ đệm gửi của Connection
             it->second->sendData(packet.data(), packet.size());
 
-            // Re-register for write events if there's pending data
+            // Kiểm tra liệu còn dữ liệu chưa gửi không (pendingData)
+            // Nếu còn ==> đăng ký sự kiện EPOLLOUT với eventloop.
             size_t pendingLen;
             if (it->second->getPendingSendData(pendingLen) != nullptr && pendingLen > 0)
             {
@@ -307,7 +326,7 @@ namespace hangman
 
         while (true)
         {
-            TaskPtr task = taskQueue->pop();
+            TaskPtr task = taskQueue->pop(); // Wait for a task ==> Do not regiester event with eventloop
             if (!task)
             {
                 break; // Queue stopped
@@ -321,28 +340,22 @@ namespace hangman
                 auto callback = std::make_shared<FunctionCallback>(
                     [task, this]()
                     {
-                        task->onComplete();
-                        
+                        // 1. Send response to requester
                         int clientFd = task->getClientFd();
+                        std::vector<uint8_t> packet = task->getResponsePacket();
                         
-                        // Send response based on task type
-                        if (auto registerTask = dynamic_cast<RegisterTask*>(task.get())) {
-                            auto response = registerTask->getResult();
-                            std::vector<uint8_t> packet = response.to_bytes();
+                        if (!packet.empty()) {
                             sendResponse(clientFd, packet);
-                            std::cout << "Sent RegisterResult to client " << clientFd << std::endl;
+                            std::cout << "Sent response to client " << clientFd << std::endl;
                         }
-                        else if (auto loginTask = dynamic_cast<LoginTask*>(task.get())) {
-                            auto response = loginTask->getResult();
-                            std::vector<uint8_t> packet = response.to_bytes();
-                            sendResponse(clientFd, packet);
-                            std::cout << "Sent LoginResult to client " << clientFd << std::endl;
-                        }
-                        else if (auto logoutTask = dynamic_cast<LogoutTask*>(task.get())) {
-                            auto response = logoutTask->getResult();
-                            std::vector<uint8_t> packet = response.to_bytes();
-                            sendResponse(clientFd, packet);
-                            std::cout << "Sent LogoutAck to client " << clientFd << std::endl;
+
+                        // 2. Send broadcast packets (if any)
+                        auto broadcasts = task->getBroadcastPackets();
+                        for (const auto& p : broadcasts) {
+                            int targetFd = p.first;
+                            const auto& data = p.second;
+                            sendResponse(targetFd, data);
+                            std::cout << "Broadcasted to client " << targetFd << std::endl;
                         }
                     });
 

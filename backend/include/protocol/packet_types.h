@@ -31,6 +31,7 @@ enum class PacketType : uint16_t {
     S2C_CreateRoomResult   = 0x0202,
     C2S_LeaveRoom          = 0x0203,
     S2C_LeaveRoomAck       = 0x0204,
+    S2C_PlayerLeftNotification = 0x0205, // New packet type
     C2S_RequestOnlineList  = 0x0205,
     S2C_OnlineList         = 0x0206,
 

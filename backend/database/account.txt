@@ -1,3 +1,4 @@
 testuser:testpass:0:0
-user2:123:5:200
+user2:123:30:40
+testuser3:testpass:0:0
 testuser2:testpass:0:0

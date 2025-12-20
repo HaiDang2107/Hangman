@@ -9,9 +9,22 @@
 
 namespace hangman {
 
+enum class PlayerState {
+    FREE,       // Đang rảnh (Ở sảnh, không trong phòng)
+    PREPARING,  // Đang chuẩn bị (Đã vào phòng, chưa bấm sẵn sàng)
+    READY,      // Sẵn sàng (Đã bấm Ready, chờ chủ phòng Start)
+    IN_GAME     // Đang trong trận chiến
+};
+
+enum class RoomState {
+    WAITING,    // Đang chờ người chơi / chờ sẵn sàng
+    PLAYING     // Đang trong trận đấu (không cho người khác join)
+};
+
 struct PlayerInfo {
     std::string username;
     int clientFd;
+    PlayerState state = PlayerState::PREPARING;
 };
 
 struct Room {
@@ -19,7 +32,17 @@ struct Room {
     std::string name;
     std::string host_username;
     std::vector<PlayerInfo> players; // List of players in the room
-    // Add more fields as needed (e.g., game state, max players)
+    RoomState state = RoomState::WAITING;
+
+    bool allPlayersReady() const {
+        if (players.size() < 2) return false;
+        for (const auto& p : players) {
+            if (p.username != host_username && p.state != PlayerState::READY) {
+                return false;
+            }
+        }
+        return true;
+    }
 };
 
 struct LeaveRoomResult {
@@ -39,6 +62,27 @@ public:
     // Service methods
     S2C_CreateRoomResult createRoom(const C2S_CreateRoom& request, int clientFd);
     LeaveRoomResult leaveRoom(const C2S_LeaveRoom& request, int clientFd);
+
+    // Helper methods for BeforePlayService
+    bool isUserInRoom(const std::string& username);
+    Room* getRoom(uint32_t roomId);
+    Room* getRoomByUsername(const std::string& username);
+    
+    // Allow BeforePlayService to access private members if needed, or expose necessary methods
+    // For now, we'll expose methods.
+    
+    // Methods to modify room state
+    void updatePlayerState(uint32_t roomId, const std::string& username, PlayerState newState);
+    void updateRoomState(uint32_t roomId, RoomState newState);
+    
+    // Add player to room (for invite accept)
+    S2C_CreateRoomResult joinRoom(uint32_t roomId, const std::string& username, int clientFd);
+    
+    // Kick player
+    void kickPlayer(uint32_t roomId, const std::string& username);
+
+    // Getters
+    std::vector<PlayerInfo> getRoomPlayers(uint32_t roomId);
 
 private:
     RoomService();

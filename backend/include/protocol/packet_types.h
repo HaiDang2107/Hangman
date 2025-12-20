@@ -31,13 +31,23 @@ enum class PacketType : uint16_t {
     S2C_CreateRoomResult   = 0x0202,
     C2S_LeaveRoom          = 0x0203,
     S2C_LeaveRoomAck       = 0x0204,
-    S2C_PlayerLeftNotification = 0x0205, // New packet type
-    C2S_RequestOnlineList  = 0x0205,
-    S2C_OnlineList         = 0x0206,
+    S2C_PlayerLeftNotification = 0x0205,
+    C2S_RequestOnlineList  = 0x0206,
+    S2C_OnlineList         = 0x0207,
+    C2S_KickPlayer         = 0x0208,
+    S2C_KickResult         = 0x0209,
 
     // Invite / Match
     C2S_SendInvite         = 0x0301,
     S2C_InviteReceived     = 0x0302,
+    C2S_RespondInvite      = 0x0303,
+    S2C_InviteResponse     = 0x0304,
+
+    // Ready / Start
+    C2S_SetReady           = 0x0401,
+    S2C_PlayerReadyUpdate  = 0x0402,
+    C2S_StartGame          = 0x0403,
+    S2C_GameStart          = 0x0404,
     C2S_RespondInvite      = 0x0303, // accept/reject
     S2C_InviteResponse     = 0x0304,
 

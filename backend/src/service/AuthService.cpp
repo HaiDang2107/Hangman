@@ -115,7 +115,7 @@ S2C_RegisterResult AuthService::registerUser(const C2S_Register& request) {
     return result;
 }
 
-S2C_LoginResult AuthService::login(const C2S_Login& request) {
+S2C_LoginResult AuthService::login(const C2S_Login& request, int clientFd) {
     S2C_LoginResult result;
 
     // Validate input
@@ -163,6 +163,7 @@ S2C_LoginResult AuthService::login(const C2S_Login& request) {
         session.wins = user.wins;
         session.total_points = user.total_points;
         session.createdAt = std::time(nullptr);
+        session.clientFd = clientFd;
         sessions[token] = session;
     }
 
@@ -276,6 +277,61 @@ std::string AuthService::hashPassword(const std::string& password) {
     // TODO: In production, use bcrypt or similar
     // For now, we use a simple approach to keep it simple
     return password;
+}
+
+std::vector<Session> AuthService::getAllSessions() {
+    std::lock_guard<std::mutex> lock(sessionsMutex);
+    std::vector<Session> result;
+    for (const auto& pair : sessions) {
+        result.push_back(pair.second);
+    }
+    return result;
+}
+
+int AuthService::getClientFd(const std::string& username) {
+    std::lock_guard<std::mutex> lock(sessionsMutex);
+    for (const auto& pair : sessions) {
+        if (pair.second.username == username) {
+            return pair.second.clientFd;
+        }
+    }
+    return -1;
+}
+
+void AuthService::updateUserStats(const std::string& username, bool isWin, uint32_t points) {
+    std::lock_guard<std::mutex> lock(usersMutex);
+    auto it = users.find(username);
+    if (it != users.end()) {
+        if (isWin) it->second.wins++;
+        it->second.total_points += points;
+        saveAllUsersToDatabase();
+    }
+}
+
+std::vector<User> AuthService::getAllUsers() {
+    std::lock_guard<std::mutex> lock(usersMutex);
+    std::vector<User> result;
+    for (const auto& pair : users) {
+        result.push_back(pair.second);
+    }
+    return result;
+}
+
+bool AuthService::saveAllUsersToDatabase() {
+    try {
+        std::ofstream file(dbPath, std::ios::trunc); // Overwrite
+        if (!file.is_open()) return false;
+
+        for (const auto& pair : users) {
+            const User& u = pair.second;
+            // Format: username:passwordHash:wins:points
+            file << u.username << ":" << u.passwordHash << ":" << u.wins << ":" << u.total_points << "\n";
+        }
+        file.close();
+        return true;
+    } catch (...) {
+        return false;
+    }
 }
 
 } // namespace hangman

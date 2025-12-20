@@ -178,12 +178,34 @@ struct S2C_PlayerReadyUpdate {
     static S2C_PlayerReadyUpdate from_payload(ByteBuffer& bb);
 };
 
+struct C2S_StartGame {
+    std::string session_token;
+    uint32_t room_id;
+    std::vector<uint8_t> to_bytes() const;
+    static C2S_StartGame from_payload(ByteBuffer& bb);
+};
+
 struct S2C_GameStart {
     uint32_t room_id;
     std::string opponent_username;
-    uint32_t seed; // random seed for word selection (optional)
+    uint32_t word_length; // Changed from seed to word_length as per requirement
     std::vector<uint8_t> to_bytes() const;
     static S2C_GameStart from_payload(ByteBuffer& bb);
+};
+
+struct C2S_KickPlayer {
+    std::string session_token;
+    uint32_t room_id;
+    std::string target_username;
+    std::vector<uint8_t> to_bytes() const;
+    static C2S_KickPlayer from_payload(ByteBuffer& bb);
+};
+
+struct S2C_KickResult {
+    ResultCode code;
+    std::string message;
+    std::vector<uint8_t> to_bytes() const;
+    static S2C_KickResult from_payload(ByteBuffer& bb);
 };
 
 // Game actions

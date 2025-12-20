@@ -279,6 +279,90 @@ namespace hangman
                     break;
                 }
 
+                case static_cast<uint16_t>(PacketType::C2S_RequestOnlineList): {
+                    C2S_RequestOnlineList req = C2S_RequestOnlineList::from_payload(buf);
+                    auto task = std::make_shared<RequestOnlineListTask>(clientFd, req);
+                    taskQueue->push(task);
+                    break;
+                }
+
+                case static_cast<uint16_t>(PacketType::C2S_SendInvite): {
+                    C2S_SendInvite req = C2S_SendInvite::from_payload(buf);
+                    auto task = std::make_shared<SendInviteTask>(clientFd, req);
+                    taskQueue->push(task);
+                    break;
+                }
+
+                case static_cast<uint16_t>(PacketType::C2S_RespondInvite): {
+                    C2S_RespondInvite req = C2S_RespondInvite::from_payload(buf);
+                    auto task = std::make_shared<RespondInviteTask>(clientFd, req);
+                    taskQueue->push(task);
+                    break;
+                }
+
+                case static_cast<uint16_t>(PacketType::C2S_SetReady): {
+                    C2S_SetReady req = C2S_SetReady::from_payload(buf);
+                    auto task = std::make_shared<SetReadyTask>(clientFd, req);
+                    taskQueue->push(task);
+                    break;
+                }
+
+                case static_cast<uint16_t>(PacketType::C2S_StartGame): {
+                    C2S_StartGame req = C2S_StartGame::from_payload(buf);
+                    auto task = std::make_shared<StartGameTask>(clientFd, req);
+                    taskQueue->push(task);
+                    break;
+                }
+
+                case static_cast<uint16_t>(PacketType::C2S_KickPlayer): {
+                    C2S_KickPlayer req = C2S_KickPlayer::from_payload(buf);
+                    auto task = std::make_shared<KickPlayerTask>(clientFd, req);
+                    taskQueue->push(task);
+                    break;
+                }
+
+                case static_cast<uint16_t>(PacketType::C2S_GuessChar): {
+                    C2S_GuessChar req = C2S_GuessChar::from_payload(buf);
+                    auto task = std::make_shared<GuessCharTask>(clientFd, req);
+                    taskQueue->push(task);
+                    break;
+                }
+
+                case static_cast<uint16_t>(PacketType::C2S_GuessWord): {
+                    C2S_GuessWord req = C2S_GuessWord::from_payload(buf);
+                    auto task = std::make_shared<GuessWordTask>(clientFd, req);
+                    taskQueue->push(task);
+                    break;
+                }
+
+                case static_cast<uint16_t>(PacketType::C2S_RequestDraw): {
+                    C2S_RequestDraw req = C2S_RequestDraw::from_payload(buf);
+                    auto task = std::make_shared<RequestDrawTask>(clientFd, req);
+                    taskQueue->push(task);
+                    break;
+                }
+
+                case static_cast<uint16_t>(PacketType::C2S_EndGame): {
+                    C2S_EndGame req = C2S_EndGame::from_payload(buf);
+                    auto task = std::make_shared<EndGameTask>(clientFd, req);
+                    taskQueue->push(task);
+                    break;
+                }
+
+                case static_cast<uint16_t>(PacketType::C2S_RequestHistory): {
+                    C2S_RequestHistory req = C2S_RequestHistory::from_payload(buf);
+                    auto task = std::make_shared<RequestHistoryTask>(clientFd, req);
+                    taskQueue->push(task);
+                    break;
+                }
+
+                case static_cast<uint16_t>(PacketType::C2S_RequestLeaderboard): {
+                    C2S_RequestLeaderboard req = C2S_RequestLeaderboard::from_payload(buf);
+                    auto task = std::make_shared<RequestLeaderboardTask>(clientFd, req);
+                    taskQueue->push(task);
+                    break;
+                }
+
                 default:
                     std::cerr << "Unknown packet type: 0x" << std::hex << packetType << std::dec << std::endl;
                     break;

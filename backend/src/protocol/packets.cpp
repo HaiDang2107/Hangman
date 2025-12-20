@@ -297,35 +297,310 @@ namespace hangman
     }
 
     // =====================================================
+    //                C2S_RequestOnlineList
+    // =====================================================
+    std::vector<uint8_t> C2S_RequestOnlineList::to_bytes() const
+    {
+        ByteBuffer bb;
+        bb.write_string(session_token);
+
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::C2S_RequestOnlineList, bb.size());
+
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+
+    C2S_RequestOnlineList C2S_RequestOnlineList::from_payload(ByteBuffer &bb)
+    {
+        C2S_RequestOnlineList packet;
+        packet.session_token = bb.read_string();
+        return packet;
+    }
+
+    // =====================================================
+    //                   S2C_OnlineList
+    // =====================================================
+    std::vector<uint8_t> S2C_OnlineList::to_bytes() const
+    {
+        ByteBuffer bb;
+        bb.write_u16(static_cast<uint16_t>(users.size()));
+        for (const auto& user : users) {
+            bb.write_string(user);
+        }
+
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::S2C_OnlineList, bb.size());
+
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+
+    S2C_OnlineList S2C_OnlineList::from_payload(ByteBuffer &bb)
+    {
+        S2C_OnlineList packet;
+        uint16_t count = bb.read_u16();
+        for (uint16_t i = 0; i < count; ++i) {
+            packet.users.push_back(bb.read_string());
+        }
+        return packet;
+    }
+
+    // =====================================================
+    //                    C2S_SendInvite
+    // =====================================================
+    std::vector<uint8_t> C2S_SendInvite::to_bytes() const
+    {
+        ByteBuffer bb;
+        bb.write_string(session_token);
+        bb.write_string(target_username);
+        bb.write_u32(room_id);
+
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::C2S_SendInvite, bb.size());
+
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+
+    C2S_SendInvite C2S_SendInvite::from_payload(ByteBuffer &bb)
+    {
+        C2S_SendInvite packet;
+        packet.session_token = bb.read_string();
+        packet.target_username = bb.read_string();
+        packet.room_id = bb.read_u32();
+        return packet;
+    }
+
+    // =====================================================
+    //                  S2C_InviteReceived
+    // =====================================================
+    std::vector<uint8_t> S2C_InviteReceived::to_bytes() const
+    {
+        ByteBuffer bb;
+        bb.write_string(from_username);
+        bb.write_u32(room_id);
+
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::S2C_InviteReceived, bb.size());
+
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+
+    S2C_InviteReceived S2C_InviteReceived::from_payload(ByteBuffer &bb)
+    {
+        S2C_InviteReceived packet;
+        packet.from_username = bb.read_string();
+        packet.room_id = bb.read_u32();
+        return packet;
+    }
+
+    // =====================================================
+    //                  C2S_RespondInvite
+    // =====================================================
+    std::vector<uint8_t> C2S_RespondInvite::to_bytes() const
+    {
+        ByteBuffer bb;
+        bb.write_string(session_token);
+        bb.write_string(from_username);
+        bb.write_u8(accept ? 1 : 0);
+
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::C2S_RespondInvite, bb.size());
+
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+
+    C2S_RespondInvite C2S_RespondInvite::from_payload(ByteBuffer &bb)
+    {
+        C2S_RespondInvite packet;
+        packet.session_token = bb.read_string();
+        packet.from_username = bb.read_string();
+        packet.accept = (bb.read_u8() != 0);
+        return packet;
+    }
+
+    // =====================================================
+    //                  S2C_InviteResponse
+    // =====================================================
+    std::vector<uint8_t> S2C_InviteResponse::to_bytes() const
+    {
+        ByteBuffer bb;
+        bb.write_string(to_username);
+        bb.write_u8(accepted ? 1 : 0);
+        bb.write_string(message);
+
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::S2C_InviteResponse, bb.size());
+
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+
+    S2C_InviteResponse S2C_InviteResponse::from_payload(ByteBuffer &bb)
+    {
+        S2C_InviteResponse packet;
+        packet.to_username = bb.read_string();
+        packet.accepted = (bb.read_u8() != 0);
+        packet.message = bb.read_string();
+        return packet;
+    }
+
+    // =====================================================
+    //                     C2S_SetReady
+    // =====================================================
+    std::vector<uint8_t> C2S_SetReady::to_bytes() const
+    {
+        ByteBuffer bb;
+        bb.write_string(session_token);
+        bb.write_u32(room_id);
+        bb.write_u8(ready ? 1 : 0);
+
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::C2S_SetReady, bb.size());
+
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+
+    C2S_SetReady C2S_SetReady::from_payload(ByteBuffer &bb)
+    {
+        C2S_SetReady packet;
+        packet.session_token = bb.read_string();
+        packet.room_id = bb.read_u32();
+        packet.ready = (bb.read_u8() != 0);
+        return packet;
+    }
+
+    // =====================================================
+    //                S2C_PlayerReadyUpdate
+    // =====================================================
+    std::vector<uint8_t> S2C_PlayerReadyUpdate::to_bytes() const
+    {
+        ByteBuffer bb;
+        bb.write_string(username);
+        bb.write_u8(ready ? 1 : 0);
+
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::S2C_PlayerReadyUpdate, bb.size());
+
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+
+    S2C_PlayerReadyUpdate S2C_PlayerReadyUpdate::from_payload(ByteBuffer &bb)
+    {
+        S2C_PlayerReadyUpdate packet;
+        packet.username = bb.read_string();
+        packet.ready = (bb.read_u8() != 0);
+        return packet;
+    }
+
+    // =====================================================
+    //                    C2S_StartGame
+    // =====================================================
+    std::vector<uint8_t> C2S_StartGame::to_bytes() const
+    {
+        ByteBuffer bb;
+        bb.write_string(session_token);
+        bb.write_u32(room_id);
+
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::C2S_StartGame, bb.size());
+
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+
+    C2S_StartGame C2S_StartGame::from_payload(ByteBuffer &bb)
+    {
+        C2S_StartGame packet;
+        packet.session_token = bb.read_string();
+        packet.room_id = bb.read_u32();
+        return packet;
+    }
+
+    // =====================================================
+    //                    S2C_GameStart
+    // =====================================================
+    std::vector<uint8_t> S2C_GameStart::to_bytes() const
+    {
+        ByteBuffer bb;
+        bb.write_u32(room_id);
+        bb.write_string(opponent_username);
+        bb.write_u32(word_length);
+
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::S2C_GameStart, bb.size());
+
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+
+    S2C_GameStart S2C_GameStart::from_payload(ByteBuffer &bb)
+    {
+        S2C_GameStart packet;
+        packet.room_id = bb.read_u32();
+        packet.opponent_username = bb.read_string();
+        packet.word_length = bb.read_u32();
+        return packet;
+    }
+
+    // =====================================================
+    //                    C2S_KickPlayer
+    // =====================================================
+    std::vector<uint8_t> C2S_KickPlayer::to_bytes() const
+    {
+        ByteBuffer bb;
+        bb.write_string(session_token);
+        bb.write_u32(room_id);
+        bb.write_string(target_username);
+
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::C2S_KickPlayer, bb.size());
+
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+
+    C2S_KickPlayer C2S_KickPlayer::from_payload(ByteBuffer &bb)
+    {
+        C2S_KickPlayer packet;
+        packet.session_token = bb.read_string();
+        packet.room_id = bb.read_u32();
+        packet.target_username = bb.read_string();
+        return packet;
+    }
+
+    // =====================================================
+    //                    S2C_KickResult
+    // =====================================================
+    std::vector<uint8_t> S2C_KickResult::to_bytes() const
+    {
+        ByteBuffer bb;
+        bb.write_u8(static_cast<uint8_t>(code));
+        bb.write_string(message);
+
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::S2C_KickResult, bb.size());
+
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+
+    S2C_KickResult S2C_KickResult::from_payload(ByteBuffer &bb)
+    {
+        S2C_KickResult packet;
+        packet.code = static_cast<ResultCode>(bb.read_u8());
+        packet.message = bb.read_string();
+        return packet;
+    }
+
+    // =====================================================
     //         ALL REMAINING PACKETS (Not Implemented)
     // =====================================================
-
-    std::vector<uint8_t> C2S_RequestOnlineList::to_bytes() const { throw std::runtime_error("Not implemented"); }
-    C2S_RequestOnlineList C2S_RequestOnlineList::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }
-
-    std::vector<uint8_t> S2C_OnlineList::to_bytes() const { throw std::runtime_error("Not implemented"); }
-    S2C_OnlineList S2C_OnlineList::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }
-
-    std::vector<uint8_t> C2S_SendInvite::to_bytes() const { throw std::runtime_error("Not implemented"); }
-    C2S_SendInvite C2S_SendInvite::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }
-
-    std::vector<uint8_t> S2C_InviteReceived::to_bytes() const { throw std::runtime_error("Not implemented"); }
-    S2C_InviteReceived S2C_InviteReceived::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }
-
-    std::vector<uint8_t> C2S_RespondInvite::to_bytes() const { throw std::runtime_error("Not implemented"); }
-    C2S_RespondInvite C2S_RespondInvite::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }
-
-    std::vector<uint8_t> S2C_InviteResponse::to_bytes() const { throw std::runtime_error("Not implemented"); }
-    S2C_InviteResponse S2C_InviteResponse::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }
-
-    std::vector<uint8_t> C2S_SetReady::to_bytes() const { throw std::runtime_error("Not implemented"); }
-    C2S_SetReady C2S_SetReady::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }
-
-    std::vector<uint8_t> S2C_PlayerReadyUpdate::to_bytes() const { throw std::runtime_error("Not implemented"); }
-    S2C_PlayerReadyUpdate S2C_PlayerReadyUpdate::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }
-
-    std::vector<uint8_t> S2C_GameStart::to_bytes() const { throw std::runtime_error("Not implemented"); }
-    S2C_GameStart S2C_GameStart::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }
 
     std::vector<uint8_t> C2S_GuessChar::to_bytes() const { throw std::runtime_error("Not implemented"); }
     C2S_GuessChar C2S_GuessChar::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }

@@ -22,6 +22,7 @@ struct Session {
     uint32_t wins;
     uint32_t total_points;
     uint64_t createdAt;
+    int clientFd = -1; // Added clientFd
 };
 
 // Authentication Service - Singleton pattern
@@ -40,16 +41,46 @@ public:
     S2C_RegisterResult registerUser(const C2S_Register& request);
 
     // Login logic
-    S2C_LoginResult login(const C2S_Login& request);
+    S2C_LoginResult login(const C2S_Login& request, int clientFd); // Updated signature
 
     // Logout logic
     S2C_LogoutAck logout(const C2S_Logout& request);
 
     // Validate session token
     bool validateSession(const std::string& token, std::string& outUsername);
+    
+    // Get all active sessions (for online list)
+    std::vector<Session> getAllSessions();
+    
+    // Get clientFd by username
+    int getClientFd(const std::string& username);
 
-    // Get session info
+        // Get session info
     bool getSessionInfo(const std::string& token, Session& outSession);
+
+    // Update user stats
+    void updateUserStats(const std::string& username, bool isWin, uint32_t points);
+    
+    // Get all users (for leaderboard)
+    std::vector<User> getAllUsers();
+
+private:
+    AuthService();
+    ~AuthService() = default;
+
+    bool userExists(const std::string& username);
+    std::string hashPassword(const std::string& password);
+    std::string generateSessionToken(const std::string& username);
+    bool saveUserToDatabase(const std::string& username, const std::string& password);
+    bool saveAllUsersToDatabase(); // Rewrite entire file
+
+    std::string dbPath;
+    std::unordered_map<std::string, User> users;
+    std::mutex usersMutex;
+
+    std::unordered_map<std::string, Session> sessions;
+    std::mutex sessionsMutex;
+};
 
 private:
     AuthService() = default;

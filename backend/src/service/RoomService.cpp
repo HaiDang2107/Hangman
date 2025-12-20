@@ -148,4 +148,123 @@ LeaveRoomResult RoomService::leaveRoom(const C2S_LeaveRoom& request, int clientF
     return result;
 }
 
+bool RoomService::isUserInRoom(const std::string& username) {
+    std::lock_guard<std::mutex> lock(roomsMutex);
+    for (const auto& pair : rooms) {
+        for (const auto& player : pair.second.players) {
+            if (player.username == username) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+Room* RoomService::getRoom(uint32_t roomId) {
+    // WARNING: Not thread safe if used without lock. 
+    // Should only be used if caller guarantees safety or for read-only where race is acceptable.
+    // Better to use specific methods.
+    auto it = rooms.find(roomId);
+    if (it != rooms.end()) return &it->second;
+    return nullptr;
+}
+
+Room* RoomService::getRoomByUsername(const std::string& username) {
+    // WARNING: Not thread safe.
+    for (auto& pair : rooms) {
+        for (const auto& player : pair.second.players) {
+            if (player.username == username) {
+                return &pair.second;
+            }
+        }
+    }
+    return nullptr;
+}
+
+void RoomService::updatePlayerState(uint32_t roomId, const std::string& username, PlayerState newState) {
+    std::lock_guard<std::mutex> lock(roomsMutex);
+    auto it = rooms.find(roomId);
+    if (it != rooms.end()) {
+        for (auto& p : it->second.players) {
+            if (p.username == username) {
+                p.state = newState;
+                break;
+            }
+        }
+    }
+}
+
+void RoomService::updateRoomState(uint32_t roomId, RoomState newState) {
+    std::lock_guard<std::mutex> lock(roomsMutex);
+    auto it = rooms.find(roomId);
+    if (it != rooms.end()) {
+        it->second.state = newState;
+    }
+}
+
+std::vector<PlayerInfo> RoomService::getRoomPlayers(uint32_t roomId) {
+    std::lock_guard<std::mutex> lock(roomsMutex);
+    auto it = rooms.find(roomId);
+    if (it != rooms.end()) {
+        return it->second.players;
+    }
+    return {};
+}
+
+S2C_CreateRoomResult RoomService::joinRoom(uint32_t roomId, const std::string& username, int clientFd) {
+    S2C_CreateRoomResult result;
+    std::lock_guard<std::mutex> lock(roomsMutex);
+    
+    auto it = rooms.find(roomId);
+    if (it == rooms.end()) {
+        result.code = ResultCode::NOT_FOUND;
+        result.message = "Room not found";
+        result.room_id = 0;
+        return result;
+    }
+    
+    Room& room = it->second;
+    if (room.players.size() >= 2) {
+        result.code = ResultCode::FAIL;
+        result.message = "Room is full";
+        result.room_id = 0;
+        return result;
+    }
+    
+    // Check if user is already in room
+    for (const auto& p : room.players) {
+        if (p.username == username) {
+            result.code = ResultCode::FAIL;
+            result.message = "User already in room";
+            result.room_id = roomId;
+            return result;
+        }
+    }
+
+    PlayerInfo info;
+    info.username = username;
+    info.clientFd = clientFd;
+    info.state = PlayerState::PREPARING;
+    room.players.push_back(info);
+    
+    result.code = ResultCode::OK;
+    result.message = "Joined room successfully";
+    result.room_id = roomId;
+    return result;
+}
+
+void RoomService::kickPlayer(uint32_t roomId, const std::string& username) {
+    std::lock_guard<std::mutex> lock(roomsMutex);
+    auto it = rooms.find(roomId);
+    if (it != rooms.end()) {
+        auto& players = it->second.players;
+        for (auto pIt = players.begin(); pIt != players.end(); ++pIt) {
+            if (pIt->username == username) {
+                players.erase(pIt);
+                break;
+            }
+        }
+    }
+}
+
 } // namespace hangman

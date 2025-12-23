@@ -48,8 +48,7 @@ enum class PacketType : uint16_t {
     S2C_PlayerReadyUpdate  = 0x0402,
     C2S_StartGame          = 0x0403,
     S2C_GameStart          = 0x0404,
-   
-
+    
 
     // Game actions
     C2S_GuessChar          = 0x0501,

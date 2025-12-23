@@ -8,14 +8,9 @@
 namespace hangman {
 
 // Singleton instance
-static AuthService* g_authService = nullptr;
-
-// Đảm bảo chỉ có 1 đối tượng được khởi tạo (Singleton)
 AuthService& AuthService::getInstance() {
-    if (!g_authService) {
-        g_authService = new AuthService();
-    }
-    return *g_authService;
+    static AuthService instance;
+    return instance;
 }
 
 bool AuthService::loadDatabase(const std::string& dbPath) {

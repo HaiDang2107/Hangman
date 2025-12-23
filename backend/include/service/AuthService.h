@@ -4,7 +4,7 @@
 #include <string>
 #include <unordered_map>
 #include <mutex>
-#include <memory>
+#include <vector>
 
 namespace hangman {
 
@@ -22,83 +22,52 @@ struct Session {
     uint32_t wins;
     uint32_t total_points;
     uint64_t createdAt;
-    int clientFd = -1; // Added clientFd
+    int clientFd = -1;
 };
 
-// Authentication Service - Singleton pattern
+// Authentication Service - Singleton
 class AuthService {
 public:
     static AuthService& getInstance();
 
-    // Delete copy and move constructors
     AuthService(const AuthService&) = delete;
     AuthService& operator=(const AuthService&) = delete;
 
-    // Load database from file
     bool loadDatabase(const std::string& dbPath);
 
-    // Registration logic
     S2C_RegisterResult registerUser(const C2S_Register& request);
-
-    // Login logic
-    S2C_LoginResult login(const C2S_Login& request, int clientFd); // Updated signature
-
-    // Logout logic
+    S2C_LoginResult login(const C2S_Login& request, int clientFd);
     S2C_LogoutAck logout(const C2S_Logout& request);
 
-    // Validate session token
     bool validateSession(const std::string& token, std::string& outUsername);
-    
-    // Get all active sessions (for online list)
-    std::vector<Session> getAllSessions();
-    
-    // Get clientFd by username
-    int getClientFd(const std::string& username);
 
-        // Get session info
+    std::vector<Session> getAllSessions();
+    int getClientFd(const std::string& username);
     bool getSessionInfo(const std::string& token, Session& outSession);
 
-    // Update user stats
     void updateUserStats(const std::string& username, bool isWin, uint32_t points);
-    
-    // Get all users (for leaderboard)
     std::vector<User> getAllUsers();
 
 private:
-    AuthService();
+    AuthService() = default;
     ~AuthService() = default;
 
-    bool userExists(const std::string& username);
-    std::string hashPassword(const std::string& password);
-    std::string generateSessionToken(const std::string& username);
-    bool saveUserToDatabase(const std::string& username, const std::string& password);
-    bool saveAllUsersToDatabase(); // Rewrite entire file
-
+    // Database
     std::string dbPath;
     std::unordered_map<std::string, User> users;
-    std::mutex usersMutex;
-
     std::unordered_map<std::string, Session> sessions;
-    std::mutex sessionsMutex;
-};
 
-private:
-    AuthService() = default;
-
-    // Database
-    std::unordered_map<std::string, User> users;  // username -> User
-    std::unordered_map<std::string, Session> sessions;  // token -> Session
     std::mutex usersMutex;
     std::mutex sessionsMutex;
-    std::string dbPath;
 
-    // Helper methods
+    // Helpers
     bool userExists(const std::string& username);
     bool verifyPassword(const std::string& username, const std::string& password);
-    void addUser(const std::string& username, const std::string& password);
+    std::string hashPassword(const std::string& password);
     std::string generateSessionToken(const std::string& username);
+    void addUser(const std::string& username, const std::string& password);
     bool saveUserToDatabase(const std::string& username, const std::string& password);
-    std::string hashPassword(const std::string& password);  // Simple hash for now
+    bool saveAllUsersToDatabase();
 };
 
 } // namespace hangman

@@ -10,6 +10,9 @@ namespace hangman {
 // Singleton instance
 static AuthService* g_authService = nullptr;
 
+// Constructor
+AuthService::AuthService() {}
+
 // Đảm bảo chỉ có 1 đối tượng được khởi tạo (Singleton)
 AuthService& AuthService::getInstance() {
     if (!g_authService) {
@@ -110,7 +113,7 @@ S2C_RegisterResult AuthService::registerUser(const C2S_Register& request) {
         return result;
     }
 
-    result.code = ResultCode::OK;
+    result.code = ResultCode::SUCCESS;
     result.message = "Account created successfully";
     return result;
 }
@@ -167,7 +170,7 @@ S2C_LoginResult AuthService::login(const C2S_Login& request, int clientFd) {
         sessions[token] = session;
     }
 
-    result.code = ResultCode::OK;
+    result.code = ResultCode::SUCCESS;
     result.message = "Login successful";
     result.session_token = token;
     result.num_of_wins = user.wins;
@@ -193,7 +196,7 @@ S2C_LogoutAck AuthService::logout(const C2S_Logout& request) {
         sessions.erase(it);
     }
 
-    result.code = ResultCode::OK;
+    result.code = ResultCode::SUCCESS;
     result.message = "Logout successful";
     return result;
 }

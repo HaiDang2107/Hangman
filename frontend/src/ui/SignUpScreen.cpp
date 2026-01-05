@@ -112,7 +112,7 @@ void SignUpScreen::drawMenu() {
     int centerX = width / 2;
     
     wattron(mainWin, COLOR_PAIR(3));
-    mvwprintw(mainWin, startY, centerX - 15, "Use ↑↓ arrows to navigate, Enter to select");
+    mvwprintw(mainWin, startY, centerX - 15, "Use UP/DOWN arrows to navigate, Enter to select");
     wattroff(mainWin, COLOR_PAIR(3));
     
     startY += 2;
@@ -120,7 +120,7 @@ void SignUpScreen::drawMenu() {
     // Sign Up option
     if (selectedOption == SignUpOption::SIGNUP) {
         wattron(mainWin, COLOR_PAIR(2) | A_BOLD);
-        mvwprintw(mainWin, startY, centerX - 12, "→  [ CREATE ACCOUNT ]  ←");
+        mvwprintw(mainWin, startY, centerX - 12, ">  [ CREATE ACCOUNT ]  <");
         wattroff(mainWin, COLOR_PAIR(2) | A_BOLD);
     } else {
         wattron(mainWin, COLOR_PAIR(3));
@@ -133,7 +133,7 @@ void SignUpScreen::drawMenu() {
     // Back to Login option
     if (selectedOption == SignUpOption::BACK_TO_LOGIN) {
         wattron(mainWin, COLOR_PAIR(2) | A_BOLD);
-        mvwprintw(mainWin, startY, centerX - 12, "→  [ BACK TO LOGIN  ]  ←");
+        mvwprintw(mainWin, startY, centerX - 12, ">  [ BACK TO LOGIN  ]  <");
         wattroff(mainWin, COLOR_PAIR(2) | A_BOLD);
     } else {
         wattron(mainWin, COLOR_PAIR(3));

@@ -134,7 +134,7 @@ void MainMenuScreen::drawMenu() {
             } else {
                 wattron(mainWin, COLOR_PAIR(2) | A_BOLD | A_REVERSE);
             }
-            mvwprintw(mainWin, startY, centerX - 2, " → %-30s ← ", menuItems[i]);
+            mvwprintw(mainWin, startY, centerX - 2, " > %-30s < ", menuItems[i]);
             
             if (option == MenuOption::LOGOUT || option == MenuOption::QUIT) {
                 wattroff(mainWin, COLOR_PAIR(6) | A_BOLD | A_REVERSE);
@@ -165,7 +165,7 @@ void MainMenuScreen::drawInstructions() {
     int y = height - 3;
     
     wattron(mainWin, COLOR_PAIR(3) | A_DIM);
-    mvwprintw(mainWin, y, (width - 50) / 2, "Use ↑↓ arrows to navigate | Enter to select");
+    mvwprintw(mainWin, y, (width - 50) / 2, "Use UP/DOWN arrows to navigate | Enter to select");
     wattroff(mainWin, COLOR_PAIR(3) | A_DIM);
 }
 

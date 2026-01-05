@@ -50,7 +50,7 @@ S2C_CreateRoomResult RoomService::createRoom(const C2S_CreateRoom& request, int 
 
     rooms[roomId] = room;
 
-    result.code = ResultCode::OK;
+    result.code = ResultCode::SUCCESS;
     result.message = "Room created successfully";
     result.room_id = roomId;
 
@@ -101,7 +101,7 @@ LeaveRoomResult RoomService::leaveRoom(const C2S_LeaveRoom& request, int clientF
     // Logic for notifications
     if (isHostLeaving) {
         // 1. Send to leaver (old host)
-        result.ackPacket.code = ResultCode::OK;
+        result.ackPacket.code = ResultCode::SUCCESS;
         result.ackPacket.message = "Rời thành công";
 
         // 2. Send to remaining player (if any)
@@ -125,7 +125,7 @@ LeaveRoomResult RoomService::leaveRoom(const C2S_LeaveRoom& request, int clientF
         }
     } else {
         // 1. Send to leaver (guest)
-        result.ackPacket.code = ResultCode::OK;
+        result.ackPacket.code = ResultCode::SUCCESS;
         result.ackPacket.message = "Rời thành công";
 
         // 2. Send to host (remaining player)
@@ -247,7 +247,7 @@ S2C_CreateRoomResult RoomService::joinRoom(uint32_t roomId, const std::string& u
     info.state = PlayerState::PREPARING;
     room.players.push_back(info);
     
-    result.code = ResultCode::OK;
+    result.code = ResultCode::SUCCESS;
     result.message = "Joined room successfully";
     result.room_id = roomId;
     return result;

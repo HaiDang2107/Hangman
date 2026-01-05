@@ -87,7 +87,7 @@ void LoginScreen::drawMenu() {
     int centerX = width / 2;
     
     wattron(mainWin, COLOR_PAIR(3));
-    mvwprintw(mainWin, startY, centerX - 15, "Use ↑↓ arrows to navigate, Enter to select");
+    mvwprintw(mainWin, startY, centerX - 30, "Use UP/DOWN arrows to navigate | TAB to switch fields | Enter to submit");
     wattroff(mainWin, COLOR_PAIR(3));
     
     startY += 2;
@@ -95,7 +95,7 @@ void LoginScreen::drawMenu() {
     // Login option
     if (selectedOption == LoginOption::LOGIN) {
         wattron(mainWin, COLOR_PAIR(2) | A_BOLD);
-        mvwprintw(mainWin, startY, centerX - 10, "→  [  LOGIN  ]  ←");
+        mvwprintw(mainWin, startY, centerX - 10, ">  [  LOGIN  ]  <");
         wattroff(mainWin, COLOR_PAIR(2) | A_BOLD);
     } else {
         wattron(mainWin, COLOR_PAIR(3));
@@ -108,7 +108,7 @@ void LoginScreen::drawMenu() {
     // Sign up option
     if (selectedOption == LoginOption::SIGNUP) {
         wattron(mainWin, COLOR_PAIR(2) | A_BOLD);
-        mvwprintw(mainWin, startY, centerX - 10, "→  [ SIGN UP ]  ←");
+        mvwprintw(mainWin, startY, centerX - 10, ">  [ SIGN UP ]  <");
         wattroff(mainWin, COLOR_PAIR(2) | A_BOLD);
     } else {
         wattron(mainWin, COLOR_PAIR(3));
@@ -121,7 +121,7 @@ void LoginScreen::drawMenu() {
     // Exit option
     if (selectedOption == LoginOption::EXIT) {
         wattron(mainWin, COLOR_PAIR(2) | A_BOLD);
-        mvwprintw(mainWin, startY, centerX - 10, "→  [  EXIT   ]  ←");
+        mvwprintw(mainWin, startY, centerX - 10, ">  [  EXIT   ]  <");
         wattroff(mainWin, COLOR_PAIR(2) | A_BOLD);
     } else {
         wattron(mainWin, COLOR_PAIR(3));
@@ -279,14 +279,25 @@ int LoginScreen::handleInput() {
             return -1;  // Exit game
         }
         
-        if (!validateInput()) {
-            return 0;  // Validation failed, stay on screen
+        // SIGN UP không cần nhập gì, chuyển trực tiếp sang màn hình đăng ký
+        if (selectedOption == LoginOption::SIGNUP) {
+            return 2;  // Signup
         }
         
+        // LOGIN yêu cầu nhập username và password
         if (selectedOption == LoginOption::LOGIN) {
+            // Nếu chưa nhập gì, chuyển sang chế độ nhập username
+            if (username.empty() && password.empty()) {
+                switchToField(InputField::USERNAME);
+                setError("Please enter your username and password (use TAB to switch fields)");
+                return 0;
+            }
+            
+            if (!validateInput()) {
+                return 0;  // Validation failed, stay on screen
+            }
+            
             return 1;  // Login
-        } else if (selectedOption == LoginOption::SIGNUP) {
-            return 2;  // Signup
         }
     }
     

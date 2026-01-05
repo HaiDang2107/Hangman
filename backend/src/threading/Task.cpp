@@ -81,7 +81,7 @@ void SendInviteTask::execute() {
     auto res = BeforePlayService::getInstance().sendInvite(request, clientFd);
     
     if (res.success) {
-        result.code = ResultCode::OK;
+        result.code = ResultCode::SUCCESS;
         result.message = "Invite sent";
         result.ack_for_type = static_cast<uint16_t>(PacketType::C2S_SendInvite);
         
@@ -135,18 +135,18 @@ std::vector<std::pair<int, std::vector<uint8_t>>> RespondInviteTask::getBroadcas
 // ============ SetReadyTask ============
 
 void SetReadyTask::execute() {
-    auto res = BeforePlayService::getInstance().setReady(request);
+    auto res = BeforePlayService::getInstance().setReady(request, clientFd);
     
     result = res.ackPacket;
     
     if (res.hostFd != -1) {
-         broadcastPackets.push_back({res.hostFd, res.updatePacket.to_bytes()});
+         broadcastPackets.push_back(std::make_pair(res.hostFd, res.updatePacket.to_bytes()));
     }
     
     if (res.gameStarted) {
-        broadcastPackets.push_back({clientFd, res.gameStartPacket.to_bytes()});
+        broadcastPackets.push_back(std::make_pair(clientFd, res.gameStartPacket.to_bytes()));
         if (res.hostFd != -1) {
-            broadcastPackets.push_back({res.hostFd, res.gameStartPacket.to_bytes()});
+            broadcastPackets.push_back(std::make_pair(res.hostFd, res.gameStartPacket.to_bytes()));
         }
     }
 }
@@ -162,16 +162,16 @@ std::vector<std::pair<int, std::vector<uint8_t>>> SetReadyTask::getBroadcastPack
 // ============ StartGameTask ============
 
 void StartGameTask::execute() {
-    auto res = BeforePlayService::getInstance().startGame(request);
+    auto res = BeforePlayService::getInstance().startGame(request, clientFd);
     
     if (res.success) {
-        result.code = ResultCode::OK;
+        result.code = ResultCode::SUCCESS;
         result.message = "Game started";
         result.ack_for_type = static_cast<uint16_t>(PacketType::C2S_StartGame);
         
-        broadcastPackets.push_back({clientFd, res.gameStartPacket.to_bytes()});
+        broadcastPackets.push_back(std::make_pair(clientFd, res.gameStartPacket.to_bytes()));
         if (res.opponentFd != -1) {
-            broadcastPackets.push_back({res.opponentFd, res.gameStartPacket.to_bytes()});
+            broadcastPackets.push_back(std::make_pair(res.opponentFd, res.gameStartPacket.to_bytes()));
         }
     } else {
         result.code = ResultCode::FAIL;
@@ -191,7 +191,7 @@ std::vector<std::pair<int, std::vector<uint8_t>>> StartGameTask::getBroadcastPac
 // ============ KickPlayerTask ============
 
 void KickPlayerTask::execute() {
-    auto res = BeforePlayService::getInstance().kickPlayer(request);
+    auto res = BeforePlayService::getInstance().kickPlayer(request, clientFd);
     
     result = res.resultPacket;
     
@@ -199,7 +199,7 @@ void KickPlayerTask::execute() {
         S2C_Error error;
         error.for_type = 0;
         error.message = "You have been kicked from the room";
-        broadcastPackets.push_back({res.targetFd, error.to_bytes()});
+        broadcastPackets.push_back(std::make_pair(res.targetFd, error.to_bytes()));
     }
 }
 

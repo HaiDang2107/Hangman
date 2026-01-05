@@ -2,7 +2,10 @@
 #include "ui/LoginScreen.h"
 #include "ui/SignUpScreen.h"
 #include "ui/MainMenuScreen.h"
+#include "network/GameClient.h"
 #include <string>
+
+using namespace hangman;
 
 enum class AppScreen {
     LOGIN,
@@ -52,26 +55,39 @@ void showMessage(const std::string& title, const std::string& message, int color
     refresh();
 }
 
-bool mockLogin(const std::string& username, const std::string& password, UserData& userData) {
-    napms(500);
+bool realLogin(const std::string& username, const std::string& password, UserData& userData) {
+    auto& client = GameClient::getInstance();
     
-    // Demo: Giả lập lấy thông tin user từ server
-    userData.username = username;
-    userData.level = 5;
-    userData.wins = 15;
-    userData.losses = 7;
-    
-    return true;
-}
-
-bool mockSignUp(const std::string& username, const std::string& password) {
-    napms(500);
-    
-    if (username == "admin") {
-        return false;
+    if (!client.isConnected()) {
+        if (!client.connect("127.0.0.1", 5000)) {
+            return false;
+        }
     }
     
-    return true;
+    auto response = client.login(username, password);
+    
+    if (response.code == ResultCode::SUCCESS) {
+        userData.username = username;
+        userData.level = 0; // Not used yet
+        userData.wins = response.num_of_wins;
+        userData.losses = 0; // Calculate from total games - wins if needed
+        return true;
+    }
+    
+    return false;
+}
+
+bool realSignUp(const std::string& username, const std::string& password) {
+    auto& client = GameClient::getInstance();
+    
+    if (!client.isConnected()) {
+        if (!client.connect("127.0.0.1", 5000)) {
+            return false;
+        }
+    }
+    
+    auto response = client.registerUser(username, password);
+    return response.code == ResultCode::SUCCESS;
 }
 
 void showComingSoon(const std::string& feature) {
@@ -117,12 +133,12 @@ int main() {
                         
                     case 1:   // Login
                         {
-                            showMessage("Logging in...", "Please wait...", 5);
+                            showMessage("Connecting...", "Please wait...", 5);
                             
                             std::string username = loginScreen.getUsername();
                             std::string password = loginScreen.getPassword();
                             
-                            bool loginSuccess = mockLogin(username, password, currentUser);
+                            bool loginSuccess = realLogin(username, password, currentUser);
                             
                             if (loginSuccess) {
                                 showMessage("Success!", 
@@ -167,7 +183,7 @@ int main() {
                             std::string username = signupScreen.getUsername();
                             std::string password = signupScreen.getPassword();
                             
-                            bool signupSuccess = mockSignUp(username, password);
+                            bool signupSuccess = realSignUp(username, password);
                             
                             if (signupSuccess) {
                                 showMessage("Account Created!", 
@@ -210,6 +226,13 @@ int main() {
                             mvprintw(LINES/2, (COLS - 20)/2, "Logging out...");
                             attroff(COLOR_PAIR(4));
                             refresh();
+                            
+                            // Logout from server
+                            auto& client = GameClient::getInstance();
+                            if (client.hasValidSession()) {
+                                client.logout();
+                            }
+                            
                             napms(1000);
                             
                             loginScreen.reset();
@@ -265,6 +288,9 @@ int main() {
     
     refresh();
     napms(2000);
+    
+    // Disconnect from server
+    GameClient::getInstance().disconnect();
     
     cleanupNcurses();
     return 0;

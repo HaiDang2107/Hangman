@@ -123,7 +123,7 @@ RespondInviteResult BeforePlayService::respondInvite(const C2S_RespondInvite& re
     // Add target to room
     result.joinRoomResult = RoomService::getInstance().joinRoom(room->id, targetUsername, targetFd);
     
-    if (result.joinRoomResult.code != ResultCode::OK) {
+    if (result.joinRoomResult.code != ResultCode::SUCCESS) {
         result.responsePacket.accepted = false;
         result.responsePacket.message = result.joinRoomResult.message;
         return result;
@@ -167,7 +167,7 @@ SetReadyResult BeforePlayService::setReady(const C2S_SetReady& request, int clie
     PlayerState newState = request.ready ? PlayerState::READY : PlayerState::PREPARING;
     RoomService::getInstance().updatePlayerState(request.room_id, username, newState);
 
-    result.ackPacket.code = ResultCode::OK;
+    result.ackPacket.code = ResultCode::SUCCESS;
     result.ackPacket.message = "Set ready success";
 
     // Notify host
@@ -302,7 +302,7 @@ KickResult BeforePlayService::kickPlayer(const C2S_KickPlayer& request, int host
     RoomService::getInstance().kickPlayer(request.room_id, request.target_username);
     
     result.success = true;
-    result.resultPacket.code = ResultCode::OK;
+    result.resultPacket.code = ResultCode::SUCCESS;
     result.resultPacket.message = "Kick success";
 
     return result;

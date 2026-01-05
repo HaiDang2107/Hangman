@@ -6,6 +6,7 @@
 #include "protocol/packets.h"
 #include "protocol/bytebuffer.h"
 #include <iostream>
+#include <iomanip>
 #include <cstring>
 #include <arpa/inet.h>
 #include <unistd.h>

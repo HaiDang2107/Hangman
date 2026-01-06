@@ -69,6 +69,8 @@ private:
     ~AuthService() = default;
 
     bool userExists(const std::string& username);
+    bool verifyPassword(const std::string& username, const std::string& password);
+    void addUser(const std::string& username, const std::string& password);
     std::string hashPassword(const std::string& password);
     std::string generateSessionToken(const std::string& username);
     bool saveUserToDatabase(const std::string& username, const std::string& password);
@@ -80,25 +82,6 @@ private:
 
     std::unordered_map<std::string, Session> sessions;
     std::mutex sessionsMutex;
-};
-
-private:
-    AuthService() = default;
-
-    // Database
-    std::unordered_map<std::string, User> users;  // username -> User
-    std::unordered_map<std::string, Session> sessions;  // token -> Session
-    std::mutex usersMutex;
-    std::mutex sessionsMutex;
-    std::string dbPath;
-
-    // Helper methods
-    bool userExists(const std::string& username);
-    bool verifyPassword(const std::string& username, const std::string& password);
-    void addUser(const std::string& username, const std::string& password);
-    std::string generateSessionToken(const std::string& username);
-    bool saveUserToDatabase(const std::string& username, const std::string& password);
-    std::string hashPassword(const std::string& password);  // Simple hash for now
 };
 
 } // namespace hangman

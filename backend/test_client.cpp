@@ -16,7 +16,7 @@ using namespace hangman;
 // Helper function to print result code as string
 std::string resultCodeToString(ResultCode code) {
     switch (code) {
-        case ResultCode::OK: return "OK";
+        case ResultCode::SUCCESS: return "OK";
         case ResultCode::FAIL: return "FAIL";
         case ResultCode::AUTH_FAIL: return "AUTH_FAIL";
         case ResultCode::INVALID: return "INVALID";
@@ -111,7 +111,7 @@ int main(int argc, char* argv[]) {
                     S2C_RegisterResult result = S2C_RegisterResult::from_payload(bb);
                     std::cout << "  Result: code=" << resultCodeToString(result.code) 
                               << " message=" << result.message << std::endl;
-                    if (result.code == ResultCode::OK) std::cout << "  ✓ PASS" << std::endl;
+                    if (result.code == ResultCode::SUCCESS) std::cout << "  ✓ PASS" << std::endl;
                     else std::cout << "  ✗ FAIL (expected OK)" << std::endl;
                 }
             } catch (const std::exception& e) {
@@ -170,7 +170,7 @@ int main(int argc, char* argv[]) {
                               << " message=" << result.message << std::endl;
                     std::cout << "  Session token: " << sessionToken << std::endl;
                     std::cout << "  Wins: " << result.num_of_wins << ", Points: " << result.total_points << std::endl;
-                    if (result.code == ResultCode::OK && !sessionToken.empty()) 
+                    if (result.code == ResultCode::SUCCESS && !sessionToken.empty()) 
                         std::cout << "  ✓ PASS" << std::endl;
                     else 
                         std::cout << "  ✗ FAIL (expected OK and token)" << std::endl;
@@ -279,7 +279,7 @@ int main(int argc, char* argv[]) {
                         bb.buf = std::vector<uint8_t>(response.begin() + PacketHeader::HEADER_SIZE, response.end());
                         S2C_LogoutAck result = S2C_LogoutAck::from_payload(bb);
                         std::cout << "  Result: code=" << resultCodeToString(result.code) << std::endl;
-                        if (result.code == ResultCode::OK) std::cout << "  ✓ PASS" << std::endl;
+                        if (result.code == ResultCode::SUCCESS) std::cout << "  ✓ PASS" << std::endl;
                         else std::cout << "  ✗ FAIL (expected OK)" << std::endl;
                     }
                 } catch (const std::exception& e) {

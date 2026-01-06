@@ -16,7 +16,7 @@ using namespace hangman;
 // Helper function to print result code as string
 std::string resultCodeToString(ResultCode code) {
     switch (code) {
-        case ResultCode::OK: return "OK";
+        case ResultCode::SUCCESS: return "OK";
         case ResultCode::FAIL: return "FAIL";
         case ResultCode::AUTH_FAIL: return "AUTH_FAIL";
         case ResultCode::INVALID: return "INVALID";
@@ -124,7 +124,7 @@ int main(int argc, char* argv[]) {
                 std::cout << "  Result: " << resultCodeToString(res.code) << std::endl;
                 std::cout << "  Message: " << res.message << std::endl;
                 
-                if (res.code == ResultCode::OK) {
+                if (res.code == ResultCode::SUCCESS) {
                     sessionToken = res.session_token;
                     std::cout << "  Session Token: " << sessionToken << std::endl;
                     std::cout << "✓ Login successful" << std::endl;
@@ -163,7 +163,7 @@ int main(int argc, char* argv[]) {
                 std::cout << "  Result: " << resultCodeToString(res.code) << std::endl;
                 std::cout << "  Message: " << res.message << std::endl;
                 
-                if (res.code == ResultCode::OK) {
+                if (res.code == ResultCode::SUCCESS) {
                     roomId = res.room_id;
                     std::cout << "  Room ID: " << roomId << std::endl;
                     std::cout << "✓ Room created successfully" << std::endl;
@@ -201,7 +201,7 @@ int main(int argc, char* argv[]) {
                 std::cout << "  Result: " << resultCodeToString(res.code) << std::endl;
                 std::cout << "  Message: " << res.message << std::endl;
                 
-                if (res.code == ResultCode::OK) {
+                if (res.code == ResultCode::SUCCESS) {
                     std::cout << "✓ Left room successfully" << std::endl;
                 } else {
                     std::cout << "✗ Failed to leave room" << std::endl;

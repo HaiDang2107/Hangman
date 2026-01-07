@@ -612,29 +612,179 @@ namespace hangman
     //         ALL REMAINING PACKETS (Not Implemented)
     // =====================================================
 
-    std::vector<uint8_t> C2S_GuessChar::to_bytes() const { throw std::runtime_error("Not implemented"); }
-    C2S_GuessChar C2S_GuessChar::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }
+    std::vector<uint8_t> C2S_GuessChar::to_bytes() const {
+        ByteBuffer bb;
+        bb.write_string(session_token);
+        bb.write_u32(room_id);
+        bb.write_u32(match_id);
+        bb.write_u8(static_cast<uint8_t>(ch));
 
-    std::vector<uint8_t> S2C_GuessCharResult::to_bytes() const { throw std::runtime_error("Not implemented"); }
-    S2C_GuessCharResult S2C_GuessCharResult::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::C2S_GuessChar, bb.size());
 
-    std::vector<uint8_t> C2S_GuessWord::to_bytes() const { throw std::runtime_error("Not implemented"); }
-    C2S_GuessWord C2S_GuessWord::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+    
+    C2S_GuessChar C2S_GuessChar::from_payload(ByteBuffer& bb) {
+        C2S_GuessChar packet;
+        packet.session_token = bb.read_string();
+        packet.room_id = bb.read_u32();
+        packet.match_id = bb.read_u32();
+        packet.ch = static_cast<char>(bb.read_u8());
+        return packet;
+    }
 
-    std::vector<uint8_t> S2C_GuessWordResult::to_bytes() const { throw std::runtime_error("Not implemented"); }
-    S2C_GuessWordResult S2C_GuessWordResult::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }
+    std::vector<uint8_t> S2C_GuessCharResult::to_bytes() const {
+        ByteBuffer bb;
+        bb.write_u8(correct ? 1 : 0);
+        bb.write_string(exposed_pattern);
+        bb.write_u8(remaining_attempts);
 
-    std::vector<uint8_t> C2S_RequestDraw::to_bytes() const { throw std::runtime_error("Not implemented"); }
-    C2S_RequestDraw C2S_RequestDraw::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::S2C_GuessCharResult, bb.size());
 
-    std::vector<uint8_t> S2C_DrawRequest::to_bytes() const { throw std::runtime_error("Not implemented"); }
-    S2C_DrawRequest S2C_DrawRequest::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+    
+    S2C_GuessCharResult S2C_GuessCharResult::from_payload(ByteBuffer& bb) {
+        S2C_GuessCharResult packet;
+        packet.correct = (bb.read_u8() != 0);
+        packet.exposed_pattern = bb.read_string();
+        packet.remaining_attempts = bb.read_u8();
+        return packet;
+    }
 
-    std::vector<uint8_t> C2S_EndGame::to_bytes() const { throw std::runtime_error("Not implemented"); }
-    C2S_EndGame C2S_EndGame::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }
+    std::vector<uint8_t> C2S_GuessWord::to_bytes() const {
+        ByteBuffer bb;
+        bb.write_string(session_token);
+        bb.write_u32(room_id);
+        bb.write_u32(match_id);
+        bb.write_string(word);
 
-    std::vector<uint8_t> S2C_GameEnd::to_bytes() const { throw std::runtime_error("Not implemented"); }
-    S2C_GameEnd S2C_GameEnd::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::C2S_GuessWord, bb.size());
+
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+    
+    C2S_GuessWord C2S_GuessWord::from_payload(ByteBuffer& bb) {
+        C2S_GuessWord packet;
+        packet.session_token = bb.read_string();
+        packet.room_id = bb.read_u32();
+        packet.match_id = bb.read_u32();
+        packet.word = bb.read_string();
+        return packet;
+    }
+
+    std::vector<uint8_t> S2C_GuessWordResult::to_bytes() const {
+        ByteBuffer bb;
+        bb.write_u8(correct ? 1 : 0);
+        bb.write_string(message);
+        bb.write_u8(remaining_attempts);
+
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::S2C_GuessWordResult, bb.size());
+
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+    
+    S2C_GuessWordResult S2C_GuessWordResult::from_payload(ByteBuffer& bb) {
+        S2C_GuessWordResult packet;
+        packet.correct = (bb.read_u8() != 0);
+        packet.message = bb.read_string();
+        packet.remaining_attempts = bb.read_u8();
+        return packet;
+    }
+
+    std::vector<uint8_t> C2S_RequestDraw::to_bytes() const {
+        ByteBuffer bb;
+        bb.write_string(session_token);
+        bb.write_u32(room_id);
+        bb.write_u32(match_id);
+
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::C2S_RequestDraw, bb.size());
+
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+    
+    C2S_RequestDraw C2S_RequestDraw::from_payload(ByteBuffer& bb) {
+        C2S_RequestDraw packet;
+        packet.session_token = bb.read_string();
+        packet.room_id = bb.read_u32();
+        packet.match_id = bb.read_u32();
+        return packet;
+    }
+
+    std::vector<uint8_t> S2C_DrawRequest::to_bytes() const {
+        ByteBuffer bb;
+        bb.write_string(from_username);
+        bb.write_u32(match_id);
+
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::S2C_DrawRequest, bb.size());
+
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+    
+    S2C_DrawRequest S2C_DrawRequest::from_payload(ByteBuffer& bb) {
+        S2C_DrawRequest packet;
+        packet.from_username = bb.read_string();
+        packet.match_id = bb.read_u32();
+        return packet;
+    }
+
+    std::vector<uint8_t> C2S_EndGame::to_bytes() const {
+        ByteBuffer bb;
+        bb.write_string(session_token);
+        bb.write_u32(room_id);
+        bb.write_u32(match_id);
+        bb.write_u8(result_code);
+        bb.write_string(message);
+
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::C2S_EndGame, bb.size());
+
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+    
+    C2S_EndGame C2S_EndGame::from_payload(ByteBuffer& bb) {
+        C2S_EndGame packet;
+        packet.session_token = bb.read_string();
+        packet.room_id = bb.read_u32();
+        packet.match_id = bb.read_u32();
+        packet.result_code = bb.read_u8();
+        packet.message = bb.read_string();
+        return packet;
+    }
+
+    std::vector<uint8_t> S2C_GameEnd::to_bytes() const {
+        ByteBuffer bb;
+        bb.write_u32(match_id);
+        bb.write_u8(result_code);
+        bb.write_string(summary);
+
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::S2C_GameEnd, bb.size());
+
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+    
+    S2C_GameEnd S2C_GameEnd::from_payload(ByteBuffer& bb) {
+        S2C_GameEnd packet;
+        packet.match_id = bb.read_u32();
+        packet.result_code = bb.read_u8();
+        packet.summary = bb.read_string();
+        return packet;
+    }
 
     std::vector<uint8_t> C2S_RequestHistory::to_bytes() const { throw std::runtime_error("Not implemented"); }
     C2S_RequestHistory C2S_RequestHistory::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }

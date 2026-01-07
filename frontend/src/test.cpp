@@ -69,6 +69,8 @@ struct GameSession {
     std::string roomName;
     std::string hostUsername;
     std::string guestUsername;
+    uint32_t roomId;
+    uint32_t matchId;
     uint32_t wordLength;
     bool isHost;
 } g_gameSession;
@@ -381,6 +383,8 @@ int main() {
                                             g_gameSession.roomName = invite.roomName;
                                             g_gameSession.hostUsername = invite.fromUsername;
                                             g_gameSession.guestUsername = currentUser.username;
+                                            g_gameSession.roomId = gameStartInfo.roomId;
+                                            g_gameSession.matchId = gameStartInfo.roomId;  // matchId = roomId
                                             g_gameSession.wordLength = gameStartInfo.wordLength;
                                             g_gameSession.isHost = false;
                                             
@@ -696,7 +700,9 @@ int main() {
                                         // Store game session info
                                         g_gameSession.roomName = roomName;
                                         g_gameSession.hostUsername = currentUser.username;
-                                        g_gameSession.guestUsername = guestUsername;
+                                        g_gameSession.guestUsername = gameStartInfo.opponentUsername;
+                                        g_gameSession.roomId = roomId;
+                                        g_gameSession.matchId = roomId;  // matchId = roomId
                                         g_gameSession.wordLength = gameStartInfo.wordLength;
                                         g_gameSession.isHost = true;
                                         
@@ -817,7 +823,10 @@ int main() {
                     g_gameSession.hostUsername,
                     g_gameSession.guestUsername,
                     currentUser.username,
-                    g_gameSession.isHost
+                    g_gameSession.isHost,
+                    g_gameSession.roomId,
+                    g_gameSession.matchId,
+                    g_gameSession.wordLength
                 );
                 
                 bool inGame = true;

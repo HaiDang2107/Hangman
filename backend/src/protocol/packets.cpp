@@ -1,5 +1,6 @@
 #include "protocol/packets.h"
 #include <stdexcept>
+#include <iostream>
 
 namespace hangman
 {
@@ -377,14 +378,22 @@ namespace hangman
     // =====================================================
     std::vector<uint8_t> S2C_InviteReceived::to_bytes() const
     {
+        std::cerr << "DEBUG: S2C_InviteReceived::to_bytes() - from=" << from_username 
+                  << ", room_id=" << room_id << ", room_name=" << room_name << std::endl;
+        
         ByteBuffer bb;
         bb.write_string(from_username);
         bb.write_u32(room_id);
+        bb.write_string(room_name);
+
+        std::cerr << "DEBUG: Payload size: " << bb.size() << std::endl;
 
         std::vector<uint8_t> header_bytes =
             PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::S2C_InviteReceived, bb.size());
 
         header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        
+        std::cerr << "DEBUG: Total packet size: " << header_bytes.size() << std::endl;
         return header_bytes;
     }
 
@@ -393,6 +402,7 @@ namespace hangman
         S2C_InviteReceived packet;
         packet.from_username = bb.read_string();
         packet.room_id = bb.read_u32();
+        packet.room_name = bb.read_string();
         return packet;
     }
 
@@ -642,8 +652,26 @@ namespace hangman
     void S2C_Leaderboard::Row::write(ByteBuffer &) const { throw std::runtime_error("Not implemented"); }
     S2C_Leaderboard::Row S2C_Leaderboard::Row::read(ByteBuffer &) { throw std::runtime_error("Not implemented"); }
 
-    std::vector<uint8_t> S2C_Ack::to_bytes() const { throw std::runtime_error("Not implemented"); }
-    S2C_Ack S2C_Ack::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }
+    std::vector<uint8_t> S2C_Ack::to_bytes() const {
+        ByteBuffer bb;
+        bb.write_u16(ack_for_type);
+        bb.write_u8(static_cast<uint8_t>(code));
+        bb.write_string(message);
+
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::S2C_Ack, bb.size());
+
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+    
+    S2C_Ack S2C_Ack::from_payload(ByteBuffer& bb) {
+        S2C_Ack ack;
+        ack.ack_for_type = bb.read_u16();
+        ack.code = static_cast<ResultCode>(bb.read_u8());
+        ack.message = bb.read_string();
+        return ack;
+    }
 
     std::vector<uint8_t> S2C_Error::to_bytes() const { throw std::runtime_error("Not implemented"); }
     S2C_Error S2C_Error::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }

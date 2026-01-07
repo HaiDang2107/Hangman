@@ -36,6 +36,18 @@ S2C_CreateRoomResult RoomService::createRoom(const C2S_CreateRoom& request, int 
 
     std::lock_guard<std::mutex> lock(roomsMutex);
 
+    // Check if user is already in a room (must check inside lock to avoid race)
+    for (const auto& pair : rooms) {
+        for (const auto& player : pair.second.players) {
+            if (player.username == username) {
+                result.code = ResultCode::INVALID;
+                result.message = "You are already in a room. Please leave it first.";
+                result.room_id = 0;
+                return result;
+            }
+        }
+    }
+
     // Create room
     uint32_t roomId = nextRoomId++;
     Room room;
@@ -263,6 +275,57 @@ void RoomService::kickPlayer(uint32_t roomId, const std::string& username) {
                 players.erase(pIt);
                 break;
             }
+        }
+    }
+}
+
+std::string RoomService::getRoomName(uint32_t roomId) {
+    std::lock_guard<std::mutex> lock(roomsMutex);
+    auto it = rooms.find(roomId);
+    if (it != rooms.end()) {
+        return it->second.name;
+    }
+    return "";
+}
+
+void RoomService::handleClientDisconnect(int clientFd) {
+    std::lock_guard<std::mutex> lock(roomsMutex);
+    
+    // Find and remove player by clientFd from all rooms
+    for (auto roomIt = rooms.begin(); roomIt != rooms.end(); ) {
+        Room& room = roomIt->second;
+        bool playerRemoved = false;
+        std::string removedUsername;
+        bool wasHost = false;
+        
+        for (auto playerIt = room.players.begin(); playerIt != room.players.end(); ++playerIt) {
+            if (playerIt->clientFd == clientFd) {
+                removedUsername = playerIt->username;
+                wasHost = (removedUsername == room.host_username);
+                room.players.erase(playerIt);
+                playerRemoved = true;
+                break;
+            }
+        }
+        
+        if (playerRemoved) {
+            std::cout << "Player " << removedUsername << " disconnected from room " 
+                      << room.id << " (fd=" << clientFd << ")" << std::endl;
+            
+            if (room.players.empty()) {
+                // Room is now empty, delete it
+                std::cout << "Room " << room.id << " deleted (empty after disconnect)" << std::endl;
+                roomIt = rooms.erase(roomIt);
+            } else if (wasHost) {
+                // Host disconnected, assign new host
+                room.host_username = room.players[0].username;
+                std::cout << "New host for room " << room.id << ": " << room.host_username << std::endl;
+                ++roomIt;
+            } else {
+                ++roomIt;
+            }
+        } else {
+            ++roomIt;
         }
     }
 }

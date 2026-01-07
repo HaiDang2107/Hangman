@@ -9,9 +9,9 @@ namespace hangman {
 
 struct InviteResult {
     S2C_InviteReceived invitePacket; // To target
-    int targetFd;
+    int targetFd = -1;
     S2C_Error errorPacket; // To sender (if failed)
-    bool success;
+    bool success = false;
 };
 
 struct RespondInviteResult {
@@ -54,7 +54,7 @@ public:
     S2C_OnlineList getOnlineList(const C2S_RequestOnlineList& request);
 
     // Invite Player
-    InviteResult sendInvite(const C2S_SendInvite& request, int senderFd);
+    void sendInvite(const C2S_SendInvite& request, int senderFd, InviteResult& outResult);
     RespondInviteResult respondInvite(const C2S_RespondInvite& request, int targetFd);
 
     // Set Ready

@@ -1,6 +1,8 @@
 #include "network/ClientSocket.h"
 #include <iostream>
 #include <cstring>
+#include <sys/select.h>
+#include <sys/time.h>
 
 namespace hangman {
 
@@ -90,6 +92,21 @@ bool ClientSocket::receiveExact(uint8_t* buffer, size_t len) {
         totalReceived += received;
     }
     return true;
+}
+
+bool ClientSocket::hasData(int timeoutMs) {
+    if (sockfd < 0) return false;
+    
+    fd_set readfds;
+    FD_ZERO(&readfds);
+    FD_SET(sockfd, &readfds);
+    
+    struct timeval timeout;
+    timeout.tv_sec = timeoutMs / 1000;
+    timeout.tv_usec = (timeoutMs % 1000) * 1000;
+    
+    int result = select(sockfd + 1, &readfds, nullptr, nullptr, &timeout);
+    return result > 0;
 }
 
 } // namespace hangman

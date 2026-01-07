@@ -1,6 +1,7 @@
 #include "service/AuthService.h"
 #include <fstream>
 #include <sstream>
+#include <iostream>
 #include <ctime>
 #include <random>
 #include <iomanip>
@@ -299,6 +300,21 @@ int AuthService::getClientFd(const std::string& username) {
         }
     }
     return -1;
+}
+
+void AuthService::handleClientDisconnect(int clientFd) {
+    std::lock_guard<std::mutex> lock(sessionsMutex);
+    
+    // Find and remove session by clientFd
+    for (auto it = sessions.begin(); it != sessions.end(); ) {
+        if (it->second.clientFd == clientFd) {
+            std::cout << "Cleaning up session for user: " << it->second.username 
+                      << " (fd=" << clientFd << ")" << std::endl;
+            it = sessions.erase(it);
+        } else {
+            ++it;
+        }
+    }
 }
 
 void AuthService::updateUserStats(const std::string& username, bool isWin, uint32_t points) {

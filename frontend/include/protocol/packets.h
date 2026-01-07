@@ -142,6 +142,7 @@ struct C2S_SendInvite {
 struct S2C_InviteReceived {
     std::string from_username;
     uint32_t room_id; // where match will occur (or 0)
+    std::string room_name;
     std::vector<uint8_t> to_bytes() const;
     static S2C_InviteReceived from_payload(ByteBuffer& bb);
 };

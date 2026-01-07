@@ -55,8 +55,11 @@ public:
     // Get clientFd by username
     int getClientFd(const std::string& username);
 
-        // Get session info
+    // Get session info
     bool getSessionInfo(const std::string& token, Session& outSession);
+
+    // Handle client disconnect - cleanup session by clientFd
+    void handleClientDisconnect(int clientFd);
 
     // Update user stats
     void updateUserStats(const std::string& username, bool isWin, uint32_t points);

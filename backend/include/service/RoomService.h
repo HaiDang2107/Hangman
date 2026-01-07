@@ -83,6 +83,12 @@ public:
 
     // Getters
     std::vector<PlayerInfo> getRoomPlayers(uint32_t roomId);
+    
+    // Get room name safely
+    std::string getRoomName(uint32_t roomId);
+    
+    // Handle client disconnect - cleanup rooms by clientFd
+    void handleClientDisconnect(int clientFd);
 
 private:
     RoomService();

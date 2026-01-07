@@ -4,6 +4,7 @@
 #include "service/BeforePlayService.h"
 #include "service/MatchService.h"
 #include "service/SummaryService.h"
+#include <iostream>
 
 namespace hangman {
 
@@ -78,7 +79,12 @@ std::vector<uint8_t> RequestOnlineListTask::getResponsePacket() const {
 // ============ SendInviteTask ============
 
 void SendInviteTask::execute() {
-    auto res = BeforePlayService::getInstance().sendInvite(request, clientFd);
+    std::cerr << "DEBUG: SendInviteTask::execute() start" << std::endl;
+    InviteResult res;
+    BeforePlayService::getInstance().sendInvite(request, clientFd, res);
+    
+    std::cerr << "DEBUG: sendInvite result - success=" << res.success 
+              << ", targetFd=" << res.targetFd << std::endl;
     
     if (res.success) {
         result.code = ResultCode::SUCCESS;
@@ -86,12 +92,16 @@ void SendInviteTask::execute() {
         result.ack_for_type = static_cast<uint16_t>(PacketType::C2S_SendInvite);
         
         if (res.targetFd != -1) {
-            broadcastPackets.push_back({res.targetFd, res.invitePacket.to_bytes()});
+            auto inviteBytes = res.invitePacket.to_bytes();
+            std::cerr << "DEBUG: Invite packet size=" << inviteBytes.size() << std::endl;
+            broadcastPackets.push_back({res.targetFd, inviteBytes});
+            std::cerr << "DEBUG: Added broadcast packet, total=" << broadcastPackets.size() << std::endl;
         }
     } else {
         result.code = ResultCode::FAIL;
         result.message = res.errorPacket.message;
         result.ack_for_type = static_cast<uint16_t>(PacketType::C2S_SendInvite);
+        std::cerr << "DEBUG: Invite failed: " << res.errorPacket.message << std::endl;
     }
 }
 

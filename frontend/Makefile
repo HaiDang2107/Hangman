@@ -24,7 +24,7 @@ MAIN_OBJECT = $(BUILD_DIR)/test.o
 ALL_OBJECTS = $(UI_OBJECTS) $(NETWORK_OBJECTS) $(PROTOCOL_OBJECTS) $(MAIN_OBJECT)
 
 # Target executable
-TARGET = client
+TARGET = build/client
 
 # Default target
 all: $(TARGET)
@@ -64,7 +64,7 @@ $(BUILD_DIR)/test.o: $(SRC_DIR)/test.cpp
 
 # Clean
 clean:
-	rm -rf $(BUILD_DIR) $(TARGET)
+	rm -rf $(BUILD_DIR)
 
 # Rebuild
 rebuild: clean all

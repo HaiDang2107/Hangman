@@ -3,6 +3,7 @@
 #include "threading/Task.h"
 #include "threading/CallbackQueue.h"
 #include "service/AuthService.h"
+#include "service/RoomService.h"
 #include "protocol/packets.h"
 #include "protocol/bytebuffer.h"
 #include <iostream>
@@ -131,6 +132,13 @@ namespace hangman
             {
                 // Connection closed
                 std::cout << "Client disconnected: fd=" << clientFd << std::endl;
+                
+                // Cleanup session in AuthService
+                AuthService::getInstance().handleClientDisconnect(clientFd);
+                
+                // Cleanup rooms in RoomService
+                RoomService::getInstance().handleClientDisconnect(clientFd);
+                
                 eventLoop->removeFd(clientFd);
                 connections.erase(it);
                 return;
@@ -419,29 +427,40 @@ namespace hangman
 
             try
             {
+                std::cerr << "DEBUG: Executing task for client " << task->getClientFd() << std::endl;
                 task->execute();
+                std::cerr << "DEBUG: Task executed successfully" << std::endl;
 
                 // Create callback to send response back to client
                 auto callback = std::make_shared<FunctionCallback>(
                     [task, this]()
                     {
+                        std::cerr << "DEBUG: Callback executing for client " << task->getClientFd() << std::endl;
+                        
                         // 1. Send response to requester
                         int clientFd = task->getClientFd();
                         std::vector<uint8_t> packet = task->getResponsePacket();
                         
+                        std::cerr << "DEBUG: Response packet size: " << packet.size() << std::endl;
+                        
                         if (!packet.empty()) {
                             sendResponse(clientFd, packet);
-                            std::cout << "Sent response to client " << clientFd << std::endl;
+                            std::cerr << "Sent response to client " << clientFd << std::endl;
                         }
 
                         // 2. Send broadcast packets (if any)
                         auto broadcasts = task->getBroadcastPackets();
+                        std::cerr << "DEBUG: Broadcast packets count: " << broadcasts.size() << std::endl;
+                        
                         for (const auto& p : broadcasts) {
                             int targetFd = p.first;
                             const auto& data = p.second;
+                            std::cerr << "DEBUG: Broadcasting to fd=" << targetFd << ", size=" << data.size() << std::endl;
                             sendResponse(targetFd, data);
-                            std::cout << "Broadcasted to client " << targetFd << std::endl;
+                            std::cerr << "Broadcasted to client " << targetFd << std::endl;
                         }
+                        
+                        std::cerr << "DEBUG: Callback finished" << std::endl;
                     });
 
                 // Push callback to network thread

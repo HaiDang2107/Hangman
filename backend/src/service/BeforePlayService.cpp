@@ -38,28 +38,45 @@ S2C_OnlineList BeforePlayService::getOnlineList(const C2S_RequestOnlineList& req
     return response;
 }
 
-InviteResult BeforePlayService::sendInvite(const C2S_SendInvite& request, int senderFd) {
-    InviteResult result;
+void BeforePlayService::sendInvite(const C2S_SendInvite& request, int senderFd, InviteResult& result) {
+    std::cerr << "DEBUG: sendInvite() called for room " << request.room_id << std::endl;
+    
     result.success = false;
     result.targetFd = -1;
+    
+    std::cerr << "DEBUG: After init - success=" << result.success << ", targetFd=" << result.targetFd << std::endl;
     
     std::string senderUsername;
     if (!AuthService::getInstance().validateSession(request.session_token, senderUsername)) {
         result.errorPacket.message = "Invalid session";
-        return result;
+        std::cerr << "DEBUG: Invalid session" << std::endl;
+        return;
     }
+
+    std::cerr << "DEBUG: Sender: " << senderUsername << std::endl;
 
     // Check if target is online
     int targetFd = AuthService::getInstance().getClientFd(request.target_username);
+    std::cerr << "DEBUG: Target FD: " << targetFd << std::endl;
+    
     if (targetFd == -1) {
         result.errorPacket.message = "User not online";
-        return result;
+        return;
     }
 
     // Check if target is FREE
     if (RoomService::getInstance().isUserInRoom(request.target_username)) {
         result.errorPacket.message = request.target_username + " is busy";
-        return result;
+        return;
+    }
+
+    // Get room name safely
+    std::string roomName = RoomService::getInstance().getRoomName(request.room_id);
+    std::cerr << "DEBUG: Room name: " << roomName << std::endl;
+    
+    if (roomName.empty()) {
+        result.errorPacket.message = "Room not found";
+        return;
     }
 
     // Forward invite
@@ -67,8 +84,10 @@ InviteResult BeforePlayService::sendInvite(const C2S_SendInvite& request, int se
     result.targetFd = targetFd;
     result.invitePacket.from_username = senderUsername;
     result.invitePacket.room_id = request.room_id;
-
-    return result;
+    result.invitePacket.room_name = roomName;
+    
+    std::cerr << "DEBUG: Before return - success=" << result.success 
+              << ", targetFd=" << result.targetFd << std::endl;
 }
 
 RespondInviteResult BeforePlayService::respondInvite(const C2S_RespondInvite& request, int targetFd) {
@@ -89,7 +108,8 @@ RespondInviteResult BeforePlayService::respondInvite(const C2S_RespondInvite& re
     result.senderFd = senderFd;
 
     if (!request.accept) {
-        result.responsePacket.to_username = request.from_username;
+        // Send decline notification to sender (host) - to_username should be the guest's name
+        result.responsePacket.to_username = targetUsername;  // FIXED: guest who declined
         result.responsePacket.accepted = false;
         result.responsePacket.message = targetUsername + " declined invite";
         return result;
@@ -129,7 +149,8 @@ RespondInviteResult BeforePlayService::respondInvite(const C2S_RespondInvite& re
         return result;
     }
 
-    result.responsePacket.to_username = request.from_username;
+    // Send response to sender (host) - to_username should be the guest's name
+    result.responsePacket.to_username = targetUsername;  // FIXED: was request.from_username
     result.responsePacket.accepted = true;
     result.responsePacket.message = targetUsername + " accepted invite";
     

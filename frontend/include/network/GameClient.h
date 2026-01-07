@@ -5,8 +5,18 @@
 #include <memory>
 #include <string>
 #include <mutex>
+#include <thread>
+#include <atomic>
+#include <functional>
+#include <queue>
 
 namespace hangman {
+
+// Event handlers for notifications
+using InviteReceivedHandler = std::function<void(const S2C_InviteReceived&)>;
+using InviteResponseHandler = std::function<void(const S2C_InviteResponse&)>;
+using PlayerReadyUpdateHandler = std::function<void(const S2C_PlayerReadyUpdate&)>;
+using GameStartHandler = std::function<void(const S2C_GameStart&)>;
 
 class GameClient {
 public:
@@ -28,22 +38,57 @@ public:
     // Room Management
     S2C_CreateRoomResult createRoom(const std::string& roomName);
     S2C_LeaveRoomAck leaveRoom(uint32_t roomId);
-
+    
+    // Online Users
+    S2C_OnlineList requestOnlineList();
+    
+    // Invitations
+    void sendInvite(const std::string& targetUsername, uint32_t roomId);
+    S2C_CreateRoomResult respondInvite(const std::string& fromUsername, bool accept);
+    
+    // Game preparation
+    S2C_Ack setReady(uint32_t roomId, bool ready);
+    S2C_Ack startGame(uint32_t roomId);
+    
+    // Event loop management
+    void startEventLoop();
+    void stopEventLoop();
+    
+    // Register event handlers
+    void setInviteReceivedHandler(InviteReceivedHandler handler) { onInviteReceived = handler; }
+    void setInviteResponseHandler(InviteResponseHandler handler) { onInviteResponse = handler; }
+    void setPlayerReadyUpdateHandler(PlayerReadyUpdateHandler handler) { onPlayerReadyUpdate = handler; }
+    void setGameStartHandler(GameStartHandler handler) { onGameStart = handler; }
+    
     // Get current session token
     const std::string& getSessionToken() const { return sessionToken; }
     bool hasValidSession() const { return !sessionToken.empty(); }
 
 private:
     GameClient();
-    ~GameClient() = default;
+    ~GameClient();
 
     // Send packet and receive response
     template<typename ResponseType>
     ResponseType sendAndReceive(const std::vector<uint8_t>& packet);
+    
+    // Event loop thread function
+    void eventLoopThread();
+    void handleNotification(const PacketHeader& header);
 
     std::unique_ptr<ClientSocket> socket;
     std::string sessionToken;
     std::mutex socketMutex;
+    
+    // Event loop
+    std::unique_ptr<std::thread> eventThread;
+    std::atomic<bool> eventLoopRunning;
+    
+    // Event handlers
+    InviteReceivedHandler onInviteReceived;
+    InviteResponseHandler onInviteResponse;
+    PlayerReadyUpdateHandler onPlayerReadyUpdate;
+    GameStartHandler onGameStart;
 };
 
 } // namespace hangman

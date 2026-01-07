@@ -26,6 +26,12 @@ public:
     // Receive data (blocking)
     bool receive(std::vector<uint8_t>& buffer, size_t expectedLen);
     bool receiveExact(uint8_t* buffer, size_t len);
+    
+    // Check if data is available (non-blocking)
+    bool hasData(int timeoutMs = 0);
+    
+    // Get socket file descriptor
+    int getSocketFd() const { return sockfd; }
 
 private:
     int sockfd;

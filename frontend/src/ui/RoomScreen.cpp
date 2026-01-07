@@ -5,19 +5,18 @@
 void RoomScreen::initWindows() {
     // Get screen size
     getmaxyx(stdscr, height, width);
-    std::cerr << "[DEBUG RoomScreen] initWindows: stdscr size " << width << "x" << height << std::endl;
 
-    // Create main window
-    mainWin = newwin(height, width, 0, 0);
+    // Create main window - leave space for player boxes at top
+    int mainWinStartY = 13;  // Player boxes are at Y=4, height=9, so start at 13
+    mainWin = newwin(height - mainWinStartY, width, mainWinStartY, 0);
     if (!mainWin) {
         std::cerr << "[ERROR RoomScreen] Failed to create mainWin!" << std::endl;
         return;
     }
     keypad(mainWin, TRUE);
-    std::cerr << "[DEBUG RoomScreen] mainWin created successfully: " << mainWin << std::endl;
     // No timeout by default - screens will be responsive
 
-    // Create player windows - positioned after compact title
+    // Create player windows - positioned at top
     int playerY = 4;
     int spacing = 3;
     int totalWidth = 2 * PLAYER_BOX_WIDTH + spacing;
@@ -266,15 +265,23 @@ void RoomScreen::drawInstructions() {
 }
 
 void RoomScreen::draw() {
+    // Clear and draw player boxes first (they're above mainWin)
+    drawPlayerBoxes();
+    
+    // Draw room title on stdscr above player boxes
+    wattron(stdscr, COLOR_PAIR(TITLE_COLOR) | A_BOLD);
+    std::string title = "Room: " + roomName;
+    mvwprintw(stdscr, 1, (width - title.length()) / 2, "%s", title.c_str());
+    wattroff(stdscr, COLOR_PAIR(TITLE_COLOR) | A_BOLD);
+    wnoutrefresh(stdscr);
+    
+    // Now draw main window below
     werase(mainWin);
     drawBorder();
     drawTitle();
     drawMenu();
     drawInstructions();
     wnoutrefresh(mainWin);
-    
-    // Draw player boxes AFTER main window so they appear on top
-    drawPlayerBoxes();
     
     doupdate();
 }

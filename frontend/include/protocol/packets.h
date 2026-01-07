@@ -190,6 +190,7 @@ struct S2C_GameStart {
     uint32_t room_id;
     std::string opponent_username;
     uint32_t word_length; // Changed from seed to word_length as per requirement
+    uint8_t current_round;  // 1 or 2
     std::vector<uint8_t> to_bytes() const;
     static S2C_GameStart from_payload(ByteBuffer& bb);
 };
@@ -223,6 +224,9 @@ struct S2C_GuessCharResult {
     bool correct;
     std::string exposed_pattern; // e.g. "_ a _ _"
     uint8_t remaining_attempts;
+    uint32_t score_gained;  // Score earned from this guess
+    uint32_t total_score;   // Player's total score
+    uint8_t current_round;  // 1 or 2
     std::vector<uint8_t> to_bytes() const;
     static S2C_GuessCharResult from_payload(ByteBuffer& bb);
 };
@@ -240,6 +244,11 @@ struct S2C_GuessWordResult {
     bool correct;
     std::string message;
     uint8_t remaining_attempts;
+    uint32_t score_gained;  // Score earned/lost from this guess
+    uint32_t total_score;   // Player's total score
+    uint8_t current_round;  // 1 or 2
+    bool round_complete;    // If this guess completed the round
+    std::string next_word_pattern;  // Pattern for next round (if round_complete)
     std::vector<uint8_t> to_bytes() const;
     static S2C_GuessWordResult from_payload(ByteBuffer& bb);
 };

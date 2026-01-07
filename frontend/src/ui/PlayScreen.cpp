@@ -22,6 +22,8 @@ PlayScreen::PlayScreen(const std::string& roomName,
       matchId(matchId),
       remainingAttempts(6),
       wordLength(wordLength),
+      currentScore(0),
+      currentRound(1),
       isMyTurn(isHost),  // Host starts first
       gameOver(false),
       iWon(false),
@@ -35,7 +37,7 @@ PlayScreen::PlayScreen(const std::string& roomName,
     }
     if (!wordPattern.empty()) wordPattern.pop_back();
     
-    gameMessage = "Game started! Good luck!";
+    gameMessage = "Round 1 - Good luck!";
     
     // Initialize input with timeout for real-time updates
     initInput();
@@ -114,16 +116,21 @@ void PlayScreen::drawGameInfo(int y, int x) {
     mvprintw(y, x, "Room: %s", roomName.c_str());
     attroff(COLOR_PAIR(3) | A_BOLD);
     
+    // Round and Score
+    attron(COLOR_PAIR(2) | A_BOLD);
+    mvprintw(y + 1, x, "Round: %d/2  |  Score: %u", currentRound, currentScore);
+    attroff(COLOR_PAIR(2) | A_BOLD);
+    
     // Players
     attron(COLOR_PAIR(4));
-    mvprintw(y + 2, x, "Host:  %s %s", hostUsername.c_str(), 
+    mvprintw(y + 3, x, "Host:  %s %s", hostUsername.c_str(), 
              (hostUsername == currentUsername) ? "(You)" : "");
-    mvprintw(y + 3, x, "Guest: %s %s", guestUsername.c_str(),
+    mvprintw(y + 4, x, "Guest: %s %s", guestUsername.c_str(),
              (guestUsername == currentUsername) ? "(You)" : "");
     attroff(COLOR_PAIR(4));
     
     // Turn indicator
-    y += 5;
+    y += 6;
     if (isMyTurn) {
         attron(COLOR_PAIR(2) | A_BOLD);
         mvprintw(y, x, ">>> YOUR TURN <<<");
@@ -360,31 +367,65 @@ int PlayScreen::handleInput() {
                         auto response = client.guessChar(roomId, matchId, guess);
                         
                         guessedChars.insert(guess);
+                        
+                        uint8_t oldRound = currentRound;
                         updateWordPattern(response.exposed_pattern);
                         setRemainingAttempts(response.remaining_attempts);
+                        setScore(response.total_score);
                         
-                        if (response.correct) {
-                            gameMessage = std::string("Correct! ") + guess + " is in the word!";
-                        } else {
-                            gameMessage = std::string("Wrong! ") + guess + " is not in the word.";
-                        }
-                        
-                        // Check if word is complete (no more underscores)
-                        bool wordComplete = true;
+                        // Check if word is complete in OLD round (before server transitioned)
+                        bool wordCompleteInOldRound = true;
                         for (char c : response.exposed_pattern) {
                             if (c == '_') {
-                                wordComplete = false;
+                                wordCompleteInOldRound = false;
                                 break;
                             }
                         }
                         
-                        if (wordComplete) {
-                            setGameOver(true, "You won! Word was: " + response.exposed_pattern);
-                        } else if (response.remaining_attempts == 0) {
-                            setGameOver(false, "Out of attempts!");
+                        // Set initial message based on guess result
+                        if (response.correct) {
+                            gameMessage = "Correct! +" + std::to_string(response.score_gained) + " points! " + guess + " is in the word!";
                         } else {
+                            gameMessage = std::string("Wrong! ") + guess + " is not in the word.";
+                        }
+                        
+                        // Check if round changed (server handles round transition)
+                        if (response.current_round > oldRound) {
+                            // Round transition happened
+                            if (wordCompleteInOldRound) {
+                                // We completed the word in old round
+                                gameMessage = "You completed Round " + std::to_string((int)oldRound) + "! Score: " + std::to_string(response.total_score) + ". Moving to Round " + std::to_string((int)response.current_round) + "...";
+                            } else {
+                                // We ran out of attempts in old round
+                                gameMessage = "Round " + std::to_string((int)oldRound) + " over. Moving to Round " + std::to_string((int)response.current_round) + "...";
+                            }
+                            
+                            // Update round AFTER showing completion message
+                            setRound(response.current_round);
+                            
+                            // Draw once to show the completion message
+                            draw();
+                            napms(2000);  // Pause 2 seconds to show message
+                            
+                            // Now transition to new round
+                            handleRoundTransition(response.exposed_pattern);
+                            gameMessage = "Round " + std::to_string((int)response.current_round) + " started!";
                             inputMode = InputMode::NORMAL;
-                            isMyTurn = false;  // Turn switches to opponent
+                            isMyTurn = true;  // Continue playing
+                        } else {
+                            // No round change - update round normally
+                            setRound(response.current_round);
+                            
+                            if (wordCompleteInOldRound && response.current_round == 2) {
+                                // Completed round 2 - game over
+                                setGameOver(true, "You won both rounds! Final score: " + std::to_string(response.total_score));
+                            } else if (response.remaining_attempts == 0 && response.current_round == 2) {
+                                // Out of attempts in round 2
+                                setGameOver(false, "Out of attempts! Final score: " + std::to_string(response.total_score));
+                            } else {
+                                inputMode = InputMode::NORMAL;
+                                isMyTurn = false;  // Turn switches to opponent
+                            }
                         }
                     } catch (const std::exception& e) {
                         gameMessage = std::string("Error: ") + e.what();
@@ -409,16 +450,47 @@ int PlayScreen::handleInput() {
                         wordInput.clear();
                         inputMode = InputMode::NORMAL;
                         
-                        if (response.correct) {
-                            setGameOver(true, "You guessed the word: " + guess + "!");
-                        } else {
-                            setRemainingAttempts(response.remaining_attempts);
-                            gameMessage = response.message;
+                        uint8_t oldRound = currentRound;
+                        setScore(response.total_score);
+                        
+                        if (response.round_complete) {
+                            // Round transition - show completion message first
+                            gameMessage = "You completed Round " + std::to_string((int)oldRound) + "! Score: " + std::to_string(response.total_score) + ". Moving to Round " + std::to_string((int)response.current_round) + "...";
                             
-                            if (response.remaining_attempts == 0) {
-                                setGameOver(false, "Out of attempts!");
+                            // Draw once to show the message
+                            draw();
+                            napms(2000);  // Pause 2 seconds
+                            
+                            // Now transition
+                            setRound(response.current_round);
+                            handleRoundTransition(response.next_word_pattern);
+                            gameMessage = "Round " + std::to_string((int)response.current_round) + " started!";
+                            isMyTurn = true;  // Continue playing in next round
+                        } else {
+                            setRound(response.current_round);
+                            
+                            if (response.correct && response.current_round == 2) {
+                                // Correct guess in round 2 - game over
+                                setGameOver(true, "You guessed the word: " + guess + "! Final score: " + std::to_string(response.total_score));
+                            } else if (response.correct && response.current_round == 1) {
+                                // This shouldn't happen (server should set round_complete), but handle it
+                                handleRoundTransition(response.next_word_pattern);
+                                gameMessage = "Correct! Moving to Round 2!";
+                                isMyTurn = true;
                             } else {
-                                isMyTurn = false;  // Turn switches to opponent
+                                setRemainingAttempts(response.remaining_attempts);
+                                gameMessage = response.message;
+                                
+                                if (response.remaining_attempts == 0 && response.current_round == 2) {
+                                    setGameOver(false, "Out of attempts! Final score: " + std::to_string(response.total_score));
+                                } else if (response.remaining_attempts == 0 && response.current_round == 1) {
+                                    // This shouldn't happen (server should set round_complete), but handle it
+                                    handleRoundTransition(response.next_word_pattern);
+                                    gameMessage = "Out of attempts! Moving to Round 2.";
+                                    isMyTurn = true;
+                                } else {
+                                    isMyTurn = false;  // Turn switches to opponent
+                                }
                             }
                         }
                     } catch (const std::exception& e) {
@@ -501,6 +573,25 @@ void PlayScreen::setGameOver(bool won, const std::string& message) {
 
 void PlayScreen::setGameMessage(const std::string& msg) {
     gameMessage = msg;
+}
+
+void PlayScreen::setScore(uint32_t score) {
+    currentScore = score;
+}
+
+void PlayScreen::setRound(uint8_t round) {
+    currentRound = round;
+}
+
+void PlayScreen::handleRoundTransition(const std::string& newPattern) {
+    // Clear guessed chars for new round
+    guessedChars.clear();
+    // Update word pattern
+    wordPattern = newPattern;
+    // Reset attempts
+    remainingAttempts = 6;
+    // Update game message
+    gameMessage = "Round " + std::to_string(currentRound) + " started!";
 }
 
 void PlayScreen::processNotifications() {

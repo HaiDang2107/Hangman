@@ -541,6 +541,7 @@ namespace hangman
         bb.write_u32(room_id);
         bb.write_string(opponent_username);
         bb.write_u32(word_length);
+        bb.write_u8(current_round);
 
         std::vector<uint8_t> header_bytes =
             PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::S2C_GameStart, bb.size());
@@ -555,6 +556,7 @@ namespace hangman
         packet.room_id = bb.read_u32();
         packet.opponent_username = bb.read_string();
         packet.word_length = bb.read_u32();
+        packet.current_round = bb.read_u8();
         return packet;
     }
 
@@ -640,6 +642,9 @@ namespace hangman
         bb.write_u8(correct ? 1 : 0);
         bb.write_string(exposed_pattern);
         bb.write_u8(remaining_attempts);
+        bb.write_u32(score_gained);
+        bb.write_u32(total_score);
+        bb.write_u8(current_round);
 
         std::vector<uint8_t> header_bytes =
             PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::S2C_GuessCharResult, bb.size());
@@ -653,6 +658,9 @@ namespace hangman
         packet.correct = (bb.read_u8() != 0);
         packet.exposed_pattern = bb.read_string();
         packet.remaining_attempts = bb.read_u8();
+        packet.score_gained = bb.read_u32();
+        packet.total_score = bb.read_u32();
+        packet.current_round = bb.read_u8();
         return packet;
     }
 
@@ -684,6 +692,11 @@ namespace hangman
         bb.write_u8(correct ? 1 : 0);
         bb.write_string(message);
         bb.write_u8(remaining_attempts);
+        bb.write_u32(score_gained);
+        bb.write_u32(total_score);
+        bb.write_u8(current_round);
+        bb.write_u8(round_complete ? 1 : 0);
+        bb.write_string(next_word_pattern);
 
         std::vector<uint8_t> header_bytes =
             PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::S2C_GuessWordResult, bb.size());
@@ -697,6 +710,11 @@ namespace hangman
         packet.correct = (bb.read_u8() != 0);
         packet.message = bb.read_string();
         packet.remaining_attempts = bb.read_u8();
+        packet.score_gained = bb.read_u32();
+        packet.total_score = bb.read_u32();
+        packet.current_round = bb.read_u8();
+        packet.round_complete = (bb.read_u8() != 0);
+        packet.next_word_pattern = bb.read_string();
         return packet;
     }
 

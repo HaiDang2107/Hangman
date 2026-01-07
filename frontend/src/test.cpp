@@ -44,6 +44,9 @@ struct GuessCharResultNotification {
     bool correct;
     std::string exposedPattern;
     uint8_t remainingAttempts;
+    uint32_t scoreGained;
+    uint32_t totalScore;
+    uint8_t currentRound;
     bool isOpponentGuess;  // true if this is opponent's guess result
 };
 
@@ -51,6 +54,11 @@ struct GuessWordResultNotification {
     bool correct;
     std::string message;
     uint8_t remainingAttempts;
+    uint32_t scoreGained;
+    uint32_t totalScore;
+    uint8_t currentRound;
+    bool roundComplete;
+    std::string nextWordPattern;
     bool isOpponentGuess;
 };
 
@@ -226,6 +234,9 @@ int main() {
             result.correct,
             result.exposed_pattern,
             result.remaining_attempts,
+            result.score_gained,
+            result.total_score,
+            result.current_round,
             true  // This is opponent's guess
         });
     });
@@ -236,6 +247,11 @@ int main() {
             result.correct,
             result.message,
             result.remaining_attempts,
+            result.score_gained,
+            result.total_score,
+            result.current_round,
+            result.round_complete,
+            result.next_word_pattern,
             true  // This is opponent's guess
         });
     });
@@ -912,17 +928,51 @@ int main() {
                                 g_guessCharResults.pop();
                                 
                                 if (result.isOpponentGuess) {
+                                    uint8_t oldRound = playScreen.getCurrentRound();
+                                    
                                     playScreen.updateWordPattern(result.exposedPattern);
                                     playScreen.setRemainingAttempts(result.remainingAttempts);
+                                    playScreen.setScore(result.totalScore);  // This is OUR score (we are the opponent)
                                     
-                                    if (result.correct) {
-                                        playScreen.setGameMessage("Opponent guessed correctly!");
+                                    // Check if round changed
+                                    if (result.currentRound > oldRound) {
+                                        // Round transition happened - check if word was completed
+                                        bool wordComplete = true;
+                                        for (char c : result.exposedPattern) {
+                                            if (c == '_') {
+                                                wordComplete = false;
+                                                break;
+                                            }
+                                        }
+                                        
+                                        if (wordComplete) {
+                                            playScreen.setGameMessage("Opponent completed Round " + std::to_string((int)oldRound) + "! Moving to Round " + std::to_string((int)result.currentRound) + "...");
+                                        } else {
+                                            playScreen.setGameMessage("Round " + std::to_string((int)oldRound) + " over. Moving to Round " + std::to_string((int)result.currentRound) + "...");
+                                        }
+                                        
+                                        // Draw once to show the message
+                                        playScreen.draw();
+                                        napms(2000);  // Pause 2 seconds
+                                        
+                                        // Now update round and transition
+                                        playScreen.setRound(result.currentRound);
+                                        playScreen.handleRoundTransition(result.exposedPattern);
+                                        playScreen.setGameMessage("Round " + std::to_string((int)result.currentRound) + " started! Waiting for opponent...");
+                                        
+                                        // Opponent caused transition, so it's still their turn (they go first in new round)
+                                        playScreen.setMyTurn(false);
                                     } else {
-                                        playScreen.setGameMessage("Opponent guessed wrong!");
+                                        playScreen.setRound(result.currentRound);
+                                        if (result.correct) {
+                                            playScreen.setGameMessage("Opponent guessed correctly!");
+                                        } else {
+                                            playScreen.setGameMessage("Opponent guessed wrong!");
+                                        }
+                                        
+                                        // Normal turn - now it's our turn
+                                        playScreen.setMyTurn(true);
                                     }
-                                    
-                                    // Now it's our turn
-                                    playScreen.setMyTurn(true);
                                     
                                     // Redraw immediately to show changes
                                     playScreen.draw();
@@ -935,12 +985,35 @@ int main() {
                                 g_guessWordResults.pop();
                                 
                                 if (result.isOpponentGuess) {
-                                    if (result.correct) {
-                                        playScreen.setGameOver(false, "Opponent guessed the word!");
+                                    uint8_t oldRound = playScreen.getCurrentRound();
+                                    playScreen.setScore(result.totalScore);
+                                    
+                                    if (result.roundComplete) {
+                                        // Opponent completed a round - show message first
+                                        playScreen.setGameMessage("Opponent completed Round " + std::to_string((int)oldRound) + "! Moving to Round " + std::to_string((int)result.currentRound) + "...");
+                                        
+                                        // Draw once to show the message
+                                        playScreen.draw();
+                                        napms(2000);  // Pause 2 seconds
+                                        
+                                        // Now transition
+                                        playScreen.setRound(result.currentRound);
+                                        playScreen.handleRoundTransition(result.nextWordPattern);
+                                        playScreen.setGameMessage("Round " + std::to_string((int)result.currentRound) + " started! Waiting for opponent...");
+                                        
+                                        // Opponent caused transition, so it's still their turn
+                                        playScreen.setMyTurn(false);
                                     } else {
-                                        playScreen.setRemainingAttempts(result.remainingAttempts);
-                                        playScreen.setGameMessage("Opponent's word guess was wrong!");
-                                        playScreen.setMyTurn(true);
+                                        playScreen.setRound(result.currentRound);
+                                        
+                                        if (result.correct && result.currentRound == 2) {
+                                            // Opponent won in round 2 - game over
+                                            playScreen.setGameOver(false, "Opponent guessed the word! They scored " + std::to_string(result.totalScore));
+                                        } else {
+                                            playScreen.setRemainingAttempts(result.remainingAttempts);
+                                            playScreen.setGameMessage(result.message);
+                                            playScreen.setMyTurn(true);
+                                        }
                                     }
                                     
                                     // Redraw immediately to show changes

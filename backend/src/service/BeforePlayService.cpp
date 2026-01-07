@@ -254,20 +254,21 @@ StartGameResult BeforePlayService::startGame(const C2S_StartGame& request, int h
     RoomService::getInstance().updatePlayerState(request.room_id, username, PlayerState::IN_GAME);
     RoomService::getInstance().updatePlayerState(request.room_id, opponentName, PlayerState::IN_GAME);
 
-    // Generate word (mock)
-    std::string word = "HANGMAN"; // TODO: Random word
-    
-    // Initialize Match
+    // Initialize Match (MatchService will generate words for both rounds)
     std::vector<std::string> players;
     for (const auto& p : room->players) {
         players.push_back(p.username);
     }
-    MatchService::getInstance().startMatch(request.room_id, players, word);
+    MatchService::getInstance().startMatch(request.room_id, players, "");  // Empty string, not used
+
+    // Get initial word length from match
+    auto matchInfo = MatchService::getInstance().getMatchInfo(request.room_id);
 
     result.success = true;
     result.gameStartPacket.room_id = request.room_id;
     result.gameStartPacket.opponent_username = opponentName; // For host
-    result.gameStartPacket.word_length = word.length();
+    result.gameStartPacket.word_length = matchInfo.wordLength;
+    result.gameStartPacket.current_round = matchInfo.currentRound;
 
     return result;
 }

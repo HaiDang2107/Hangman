@@ -231,16 +231,14 @@ void GuessCharTask::execute() {
         
         // Broadcast to opponent about the guess (only if opponent is different from requester)
         if (res.opponentFd != -1 && res.opponentFd != clientFd) {
-            // Get opponent's pattern from MatchService
-            auto opponentPattern = MatchService::getInstance().getOpponentPattern(
-                request.room_id, res.guesserUsername, request.ch, res.resultPacket.correct
-            );
-            
-            // Create a notification packet for opponent
+            // Use pre-calculated opponent pattern and score from result
             S2C_GuessCharResult opponentNotif;
             opponentNotif.correct = res.resultPacket.correct;
-            opponentNotif.exposed_pattern = opponentPattern;
+            opponentNotif.exposed_pattern = res.opponentPattern;  // Already calculated after round transition
             opponentNotif.remaining_attempts = res.resultPacket.remaining_attempts;
+            opponentNotif.score_gained = res.resultPacket.score_gained;
+            opponentNotif.total_score = res.opponentScore;  // Opponent's own score
+            opponentNotif.current_round = res.resultPacket.current_round;
             
             broadcastPackets.push_back({res.opponentFd, opponentNotif.to_bytes()});
         }
@@ -268,10 +266,20 @@ void GuessWordTask::execute() {
         
         // Broadcast to opponent about the guess (only if opponent is different from requester)
         if (res.opponentFd != -1 && res.opponentFd != clientFd) {
+            // Get opponent's own score (not the guesser's score!)
+            uint32_t opponentScore = MatchService::getInstance().getOpponentScore(
+                request.room_id, res.guesserUsername
+            );
+            
             S2C_GuessWordResult opponentNotif;
             opponentNotif.correct = res.resultPacket.correct;
             opponentNotif.message = res.resultPacket.message;
             opponentNotif.remaining_attempts = res.resultPacket.remaining_attempts;
+            opponentNotif.score_gained = res.resultPacket.score_gained;
+            opponentNotif.total_score = opponentScore;  // Use opponent's score!
+            opponentNotif.current_round = res.resultPacket.current_round;
+            opponentNotif.round_complete = res.resultPacket.round_complete;
+            opponentNotif.next_word_pattern = res.resultPacket.next_word_pattern;
             
             broadcastPackets.push_back({res.opponentFd, opponentNotif.to_bytes()});
         }

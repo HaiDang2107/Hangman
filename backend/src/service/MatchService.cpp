@@ -6,6 +6,8 @@
 #include <sstream>
 #include <ctime>
 #include <filesystem>
+#include <random>
+#include <algorithm>
 
 namespace hangman {
 
@@ -14,28 +16,122 @@ static MatchService* g_matchService = nullptr;
 MatchService& MatchService::getInstance() {
     if (!g_matchService) {
         g_matchService = new MatchService();
+        g_matchService->loadWords();  // Load words on first access
     }
     return *g_matchService;
+}
+
+void MatchService::loadWords() {
+    // Load Round 1 words (4-7 letters)
+    std::ifstream file1("database/words_round1.txt");
+    if (file1.is_open()) {
+        std::string word;
+        while (std::getline(file1, word)) {
+            // Remove whitespace and convert to uppercase
+            word.erase(std::remove_if(word.begin(), word.end(), ::isspace), word.end());
+            std::transform(word.begin(), word.end(), word.begin(), ::toupper);
+            if (word.length() >= 4 && word.length() <= 7) {
+                round1Words.push_back(word);
+            }
+        }
+        file1.close();
+    }
+    
+    // Load Round 2 words (8-12 letters)
+    std::ifstream file2("database/words_round2.txt");
+    if (file2.is_open()) {
+        std::string word;
+        while (std::getline(file2, word)) {
+            word.erase(std::remove_if(word.begin(), word.end(), ::isspace), word.end());
+            std::transform(word.begin(), word.end(), word.begin(), ::toupper);
+            if (word.length() >= 8 && word.length() <= 12) {
+                round2Words.push_back(word);
+            }
+        }
+        file2.close();
+    }
+    
+    std::cout << "Loaded " << round1Words.size() << " round 1 words and " 
+              << round2Words.size() << " round 2 words" << std::endl;
+}
+
+std::string MatchService::getRandomWord(uint8_t round) {
+    // For testing: always return first word
+    if (round == 1 && !round1Words.empty()) {
+        return round1Words[0];  // First word for testing
+    } else if (round == 2 && !round2Words.empty()) {
+        return round2Words[0];  // First word for testing
+    }
+    
+    // Fallback
+    return round == 1 ? "GAME" : "COMPUTER";
+}
+
+uint32_t MatchService::calculateScore(uint8_t round, bool correctGuess, bool isWordGuess, 
+                                      char ch, const std::string& word) {
+    if (isWordGuess) {
+        // Guess entire word
+        if (correctGuess) {
+            return round == 1 ? 30 : 50;  // Bonus for guessing word
+        } else {
+            return 0;  // Will be handled as negative later
+        }
+    } else {
+        // Guess single character
+        if (correctGuess) {
+            // Count occurrences of character in word
+            uint32_t count = 0;
+            for (char c : word) {
+                if (c == ch) count++;
+            }
+            uint32_t pointsPerChar = round == 1 ? 10 : 15;
+            return pointsPerChar * count;
+        }
+    }
+    return 0;
 }
 
 void MatchService::startMatch(uint32_t roomId, const std::vector<std::string>& players, const std::string& word) {
     std::lock_guard<std::mutex> lock(matchesMutex);
     
     Match match;
-    match.matchId = roomId; // Use roomId as matchId for simplicity
+    match.matchId = roomId;
     match.roomId = roomId;
-    match.word = word;
+    match.currentRound = 1;
+    
+    // Get words for both rounds
+    match.round1Word = getRandomWord(1);
+    match.round2Word = getRandomWord(2);
+    match.currentWord = match.round1Word;
     match.active = true;
 
     for (const auto& p : players) {
         PlayerMatchState state;
         state.username = p;
         state.remainingAttempts = 6;
+        state.score = 0;
         match.playerStates[p] = state;
     }
 
     matches[roomId] = match;
-    std::cout << "Match started for room " << roomId << " with word " << word << std::endl;
+    std::cout << "Match started for room " << roomId 
+              << " - Round 1: " << match.round1Word 
+              << ", Round 2: " << match.round2Word << std::endl;
+}
+
+MatchInfo MatchService::getMatchInfo(uint32_t roomId) {
+    std::lock_guard<std::mutex> lock(matchesMutex);
+    MatchInfo info;
+    info.wordLength = 0;
+    info.currentRound = 1;
+    
+    auto it = matches.find(roomId);
+    if (it != matches.end()) {
+        info.wordLength = it->second.currentWord.length();
+        info.currentRound = it->second.currentRound;
+    }
+    
+    return info;
 }
 
 std::string MatchService::getExposedPattern(const std::string& word, const std::set<char>& guessed) {
@@ -80,13 +176,31 @@ std::string MatchService::getOpponentPattern(uint32_t roomId, const std::string&
     }
     
     // Generate pattern based on opponent's guessed chars
-    return getExposedPattern(match.word, opponentState.guessedChars);
+    return getExposedPattern(match.currentWord, opponentState.guessedChars);
+}
+
+uint32_t MatchService::getOpponentScore(uint32_t roomId, const std::string& guesserUsername) {
+    std::lock_guard<std::mutex> lock(matchesMutex);
+    auto it = matches.find(roomId);
+    if (it == matches.end()) return 0;
+    
+    Match& match = it->second;
+    
+    // Find opponent
+    for (const auto& pair : match.playerStates) {
+        if (pair.first != guesserUsername) {
+            return pair.second.score;
+        }
+    }
+    
+    return 0;
 }
 
 GuessCharResult MatchService::guessChar(const C2S_GuessChar& request) {
     GuessCharResult result;
     result.success = false;
     result.opponentFd = -1;
+    result.scoreGained = 0;
 
     std::string username;
     if (!AuthService::getInstance().validateSession(request.session_token, username)) {
@@ -115,18 +229,22 @@ GuessCharResult MatchService::guessChar(const C2S_GuessChar& request) {
 
     // Process guess
     bool correct = false;
-    if (match.word.find(request.ch) != std::string::npos) {
+    if (match.currentWord.find(request.ch) != std::string::npos) {
         correct = true;
+        // Add to match's revealed chars (shared between all players)
+        match.revealedChars.insert(request.ch);
+        
+        // Calculate score for correct guess
+        result.scoreGained = calculateScore(match.currentRound, true, false, request.ch, match.currentWord);
+        state.score += result.scoreGained;
     } else {
+        // Wrong guess - no score penalty for character guess, but lose attempt
         if (state.remainingAttempts > 0) state.remainingAttempts--;
     }
     state.guessedChars.insert(request.ch);
 
     result.success = true;
     result.guesserUsername = username;
-    result.resultPacket.correct = correct;
-    result.resultPacket.remaining_attempts = state.remainingAttempts;
-    result.resultPacket.exposed_pattern = getExposedPattern(match.word, state.guessedChars);
 
     // Find opponent
     for (const auto& pair : match.playerStates) {
@@ -136,26 +254,86 @@ GuessCharResult MatchService::guessChar(const C2S_GuessChar& request) {
         }
     }
 
-    // Check win/loss condition
+    // Check win/loss condition for current round BEFORE creating response packet
     bool won = true;
-    for (char c : match.word) {
-        if (state.guessedChars.find(c) == state.guessedChars.end()) {
+    for (char c : match.currentWord) {
+        if (match.revealedChars.find(c) == match.revealedChars.end()) {
             won = false;
             break;
         }
     }
 
     if (won) {
-        state.finished = true;
-        state.won = true;
-        // Note: Client should send EndGame or we can trigger it. 
-        // But protocol has C2S_EndGame, so maybe client detects win and sends EndGame?
-        // Or server sends GameEnd?
-        // Usually server decides. But let's stick to protocol.
-        // If client sees pattern complete, it knows it won.
+        // Player completed current round
+        if (match.currentRound == 1) {
+            // Move to round 2 - both players transition together
+            match.currentRound = 2;
+            match.currentWord = match.round2Word;
+            match.revealedChars.clear();  // Clear revealed chars for new round
+            
+            // Reset ALL players for round 2
+            for (auto& playerPair : match.playerStates) {
+                playerPair.second.guessedChars.clear();
+                playerPair.second.remainingAttempts = 6;
+                playerPair.second.finished = false;
+            }
+            
+            std::cout << "Player " << username << " completed Round 1, both players moving to Round 2" << std::endl;
+        } else {
+            // Completed round 2 - game over
+            state.finished = true;
+            state.won = true;
+            std::cout << "Player " << username << " completed Round 2 with score " << state.score << std::endl;
+        }
     } else if (state.remainingAttempts == 0) {
-        state.finished = true;
-        state.won = false;
+        // Out of attempts in current round
+        if (match.currentRound == 1) {
+            // Move to round 2 - both players transition together
+            match.currentRound = 2;
+            match.currentWord = match.round2Word;
+            match.revealedChars.clear();  // Clear revealed chars for new round
+            
+            // Reset ALL players for round 2
+            for (auto& playerPair : match.playerStates) {
+                playerPair.second.guessedChars.clear();
+                playerPair.second.remainingAttempts = 6;
+                playerPair.second.finished = false;
+            }
+            
+            std::cout << "Player " << username << " ran out of attempts in Round 1, both players moving to Round 2" << std::endl;
+        } else {
+            // Lost in round 2
+            state.finished = true;
+            state.won = false;
+        }
+    }
+
+    // Get fresh state reference after potential reset
+    auto& freshState = match.playerStates[username];
+    
+    // NOW create response packet AFTER round transition with fresh state
+    // Use match.revealedChars for pattern (shared between all players)
+    result.resultPacket.correct = correct;
+    result.resultPacket.remaining_attempts = freshState.remainingAttempts;
+    result.resultPacket.exposed_pattern = getExposedPattern(match.currentWord, match.revealedChars);
+    result.resultPacket.score_gained = result.scoreGained;
+    result.resultPacket.total_score = freshState.score;
+    result.resultPacket.current_round = match.currentRound;
+
+    // Create opponent's pattern AFTER round transition
+    // SAME pattern for opponent (using shared revealedChars)
+    std::string opponentUsername;
+    for (const auto& pair : match.playerStates) {
+        if (pair.first != username) {
+            opponentUsername = pair.first;
+            break;
+        }
+    }
+    
+    if (!opponentUsername.empty()) {
+        auto& opponentState = match.playerStates[opponentUsername];
+        result.opponentPattern = getExposedPattern(match.currentWord, match.revealedChars);
+        result.opponentScore = opponentState.score;
     }
 
     return result;
@@ -166,6 +344,7 @@ GuessWordResult MatchService::guessWord(const C2S_GuessWord& request) {
     result.success = false;
     result.gameEnded = false;
     result.opponentFd = -1;
+    result.scoreGained = 0;
 
     std::string username;
     if (!AuthService::getInstance().validateSession(request.session_token, username)) {
@@ -188,8 +367,28 @@ GuessWordResult MatchService::guessWord(const C2S_GuessWord& request) {
         return result;
     }
 
-    bool correct = (request.word == match.word);
-    if (!correct) {
+    // Convert guess to uppercase for comparison
+    std::string guessUpper = request.word;
+    std::transform(guessUpper.begin(), guessUpper.end(), guessUpper.begin(), ::toupper);
+    
+    bool correct = (guessUpper == match.currentWord);
+    
+    if (correct) {
+        // Correct word guess - bonus points
+        uint32_t bonus = calculateScore(match.currentRound, true, true, '\0', match.currentWord);
+        result.scoreGained = bonus;
+        state.score += bonus;
+    } else {
+        // Wrong word guess - penalty
+        int32_t penalty = (match.currentRound == 1) ? 10 : 15;
+        if (state.score >= penalty) {
+            state.score -= penalty;
+        } else {
+            state.score = 0;
+        }
+        result.scoreGained = 0;  // Will show as negative in message
+        
+        // Also lose an attempt
         if (state.remainingAttempts > 0) state.remainingAttempts--;
     }
 
@@ -197,6 +396,10 @@ GuessWordResult MatchService::guessWord(const C2S_GuessWord& request) {
     result.guesserUsername = username;
     result.resultPacket.correct = correct;
     result.resultPacket.remaining_attempts = state.remainingAttempts;
+    result.resultPacket.score_gained = result.scoreGained;
+    result.resultPacket.total_score = state.score;
+    result.resultPacket.current_round = match.currentRound;
+    result.resultPacket.round_complete = false;
     
     // Find opponent
     for (const auto& pair : match.playerStates) {
@@ -207,16 +410,71 @@ GuessWordResult MatchService::guessWord(const C2S_GuessWord& request) {
     }
     
     if (correct) {
-        result.resultPacket.message = "Correct! You win!";
-        state.finished = true;
-        state.won = true;
-        result.gameEnded = true;
-    } else {
-        result.resultPacket.message = "Incorrect!";
-        if (state.remainingAttempts == 0) {
+        // Player guessed the word correctly
+        if (match.currentRound == 1) {
+            // Move to round 2 - both players transition together
+            result.resultPacket.message = "Correct! Moving to Round 2!";
+            result.resultPacket.round_complete = true;
+            
+            match.currentRound = 2;
+            match.currentWord = match.round2Word;
+            match.revealedChars.clear();  // Clear revealed chars for new round
+            
+            // Reset ALL players for round 2
+            for (auto& playerPair : match.playerStates) {
+                playerPair.second.guessedChars.clear();
+                playerPair.second.remainingAttempts = 6;
+                playerPair.second.finished = false;
+            }
+            
+            // Provide pattern for next round
+            result.resultPacket.next_word_pattern = std::string(match.currentWord.length() * 2 - 1, '_');
+            for (size_t i = 1; i < match.currentWord.length() * 2 - 1; i += 2) {
+                result.resultPacket.next_word_pattern[i] = ' ';
+            }
+            
+            std::cout << "Player " << username << " guessed Round 1 word, both players moving to Round 2" << std::endl;
+        } else {
+            // Completed round 2
+            result.resultPacket.message = "Correct! You completed both rounds with score " + std::to_string(state.score) + "!";
             state.finished = true;
-            state.won = false;
+            state.won = true;
             result.gameEnded = true;
+            
+            std::cout << "Player " << username << " completed all rounds with score " << state.score << std::endl;
+        }
+    } else {
+        int32_t penalty = (match.currentRound == 1) ? 10 : 15;
+        result.resultPacket.message = "Incorrect! Lost " + std::to_string(penalty) + " points";
+        
+        if (state.remainingAttempts == 0) {
+            if (match.currentRound == 1) {
+                // Out of attempts in round 1, move to round 2 - both players transition
+                result.resultPacket.message += ". Out of attempts! Moving to Round 2.";
+                result.resultPacket.round_complete = true;
+                
+                match.currentRound = 2;
+                match.currentWord = match.round2Word;
+                match.revealedChars.clear();  // Clear revealed chars for new round
+                
+                // Reset ALL players for round 2
+                for (auto& playerPair : match.playerStates) {
+                    playerPair.second.guessedChars.clear();
+                    playerPair.second.remainingAttempts = 6;
+                    playerPair.second.finished = false;
+                }
+                
+                result.resultPacket.next_word_pattern = std::string(match.currentWord.length() * 2 - 1, '_');
+                for (size_t i = 1; i < match.currentWord.length() * 2 - 1; i += 2) {
+                    result.resultPacket.next_word_pattern[i] = ' ';
+                }
+            } else {
+                // Out of attempts in round 2 - game over
+                state.finished = true;
+                state.won = false;
+                result.gameEnded = true;
+                result.resultPacket.message = "Out of attempts! Final score: " + std::to_string(state.score);
+            }
         }
     }
 

@@ -31,6 +31,8 @@ private:
     std::set<char> guessedChars;  // Set of guessed characters
     int remainingAttempts;
     int wordLength;
+    uint32_t currentScore;        // Player's current score
+    uint8_t currentRound;         // 1 or 2
     bool isMyTurn;
     bool gameOver;
     bool iWon;
@@ -73,12 +75,16 @@ public:
     void setRemainingAttempts(int attempts);
     void setMyTurn(bool myTurn);
     void setGameOver(bool won, const std::string& message);
-    void setGameMessage(const std::string& msg);
+    void setGameMessage(const std::string& message);
+    void setScore(uint32_t score);
+    void setRound(uint8_t round);
+    void handleRoundTransition(const std::string& newPattern);
     
     // Getters
     bool isGameOver() const { return gameOver; }
     uint32_t getRoomId() const { return roomId; }
     uint32_t getMatchId() const { return matchId; }
+    uint8_t getCurrentRound() const { return currentRound; }
 };
 
 } // namespace hangman

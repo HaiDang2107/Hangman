@@ -228,6 +228,17 @@ void GuessCharTask::execute() {
     success = res.success;
     if (success) {
         result = res.resultPacket;
+        
+        // Broadcast to opponent about the guess (only if opponent is different from requester)
+        if (res.opponentFd != -1 && res.opponentFd != clientFd) {
+            // Create a notification packet for opponent
+            S2C_GuessCharResult opponentNotif;
+            opponentNotif.correct = res.resultPacket.correct;
+            opponentNotif.exposed_pattern = res.resultPacket.exposed_pattern;
+            opponentNotif.remaining_attempts = res.resultPacket.remaining_attempts;
+            
+            broadcastPackets.push_back({res.opponentFd, opponentNotif.to_bytes()});
+        }
     } else {
         error = res.errorPacket;
     }
@@ -238,6 +249,10 @@ std::vector<uint8_t> GuessCharTask::getResponsePacket() const {
     return error.to_bytes();
 }
 
+std::vector<std::pair<int, std::vector<uint8_t>>> GuessCharTask::getBroadcastPackets() const {
+    return broadcastPackets;
+}
+
 // ============ GuessWordTask ============
 
 void GuessWordTask::execute() {
@@ -245,6 +260,16 @@ void GuessWordTask::execute() {
     success = res.success;
     if (success) {
         result = res.resultPacket;
+        
+        // Broadcast to opponent about the guess (only if opponent is different from requester)
+        if (res.opponentFd != -1 && res.opponentFd != clientFd) {
+            S2C_GuessWordResult opponentNotif;
+            opponentNotif.correct = res.resultPacket.correct;
+            opponentNotif.message = res.resultPacket.message;
+            opponentNotif.remaining_attempts = res.resultPacket.remaining_attempts;
+            
+            broadcastPackets.push_back({res.opponentFd, opponentNotif.to_bytes()});
+        }
     } else {
         error = res.errorPacket;
     }
@@ -253,6 +278,10 @@ void GuessWordTask::execute() {
 std::vector<uint8_t> GuessWordTask::getResponsePacket() const {
     if (success) return result.to_bytes();
     return error.to_bytes();
+}
+
+std::vector<std::pair<int, std::vector<uint8_t>>> GuessWordTask::getBroadcastPackets() const {
+    return broadcastPackets;
 }
 
 // ============ RequestDrawTask ============

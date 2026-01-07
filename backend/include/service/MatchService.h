@@ -29,6 +29,8 @@ struct GuessCharResult {
     S2C_GuessCharResult resultPacket;
     bool success;
     S2C_Error errorPacket;
+    int opponentFd;
+    std::string guesserUsername;
 };
 
 struct GuessWordResult {
@@ -36,6 +38,8 @@ struct GuessWordResult {
     bool success;
     S2C_Error errorPacket;
     bool gameEnded; // If this guess ended the game for this player
+    int opponentFd;
+    std::string guesserUsername;
 };
 
 struct EndGameResult {

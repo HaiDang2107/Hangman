@@ -300,13 +300,24 @@ int PlayScreen::handleInput() {
                             inputMode = InputMode::NORMAL;
                             break;
                         case 1:  // Request Draw
-                            // TODO: Send draw request packet
-                            gameMessage = "Draw request sent!";
-                            inputMode = InputMode::NORMAL;
+                            try {
+                                auto& client = GameClient::getInstance();
+                                client.requestDraw(roomId, matchId);
+                                gameMessage = "Draw request sent to opponent!";
+                                inputMode = InputMode::NORMAL;
+                            } catch (const std::exception& e) {
+                                gameMessage = std::string("Error: ") + e.what();
+                            }
                             break;
                         case 2:  // Surrender
-                            // TODO: Send surrender packet
-                            setGameOver(false, "You surrendered");
+                            try {
+                                auto& client = GameClient::getInstance();
+                                // result_code: 0 = resignation
+                                client.endGame(roomId, matchId, 0, "Player surrendered");
+                                setGameOver(false, "You surrendered");
+                            } catch (const std::exception& e) {
+                                gameMessage = std::string("Error: ") + e.what();
+                            }
                             break;
                         case 3:  // Exit
                             return -1;
@@ -329,11 +340,41 @@ int PlayScreen::handleInput() {
                 if (guessedChars.count(guess)) {
                     gameMessage = "Already guessed that letter!";
                 } else {
-                    // TODO: Send C2S_GuessChar packet
-                    guessedChars.insert(guess);
-                    gameMessage = std::string("Guessed: ") + guess;
-                    inputMode = InputMode::NORMAL;
-                    // Server will respond with result
+                    // Send C2S_GuessChar packet
+                    try {
+                        auto& client = GameClient::getInstance();
+                        auto response = client.guessChar(roomId, matchId, guess);
+                        
+                        guessedChars.insert(guess);
+                        updateWordPattern(response.exposed_pattern);
+                        setRemainingAttempts(response.remaining_attempts);
+                        
+                        if (response.correct) {
+                            gameMessage = std::string("Correct! ") + guess + " is in the word!";
+                        } else {
+                            gameMessage = std::string("Wrong! ") + guess + " is not in the word.";
+                        }
+                        
+                        // Check if word is complete (no more underscores)
+                        bool wordComplete = true;
+                        for (char c : response.exposed_pattern) {
+                            if (c == '_') {
+                                wordComplete = false;
+                                break;
+                            }
+                        }
+                        
+                        if (wordComplete) {
+                            setGameOver(true, "You won! Word was: " + response.exposed_pattern);
+                        } else if (response.remaining_attempts == 0) {
+                            setGameOver(false, "Out of attempts!");
+                        } else {
+                            inputMode = InputMode::NORMAL;
+                            isMyTurn = false;  // Turn switches to opponent
+                        }
+                    } catch (const std::exception& e) {
+                        gameMessage = std::string("Error: ") + e.what();
+                    }
                 }
             }
             break;
@@ -345,12 +386,30 @@ int PlayScreen::handleInput() {
                 gameMessage = "";
             } else if (ch == 10 || ch == 13) {  // ENTER
                 if (!wordInput.empty()) {
-                    // TODO: Send C2S_GuessWord packet
-                    std::string guess = wordInput;
-                    wordInput.clear();
-                    inputMode = InputMode::NORMAL;
-                    gameMessage = "Word guessed: " + guess;
-                    // Server will respond with result
+                    // Send C2S_GuessWord packet
+                    try {
+                        auto& client = GameClient::getInstance();
+                        std::string guess = wordInput;
+                        auto response = client.guessWord(roomId, matchId, guess);
+                        
+                        wordInput.clear();
+                        inputMode = InputMode::NORMAL;
+                        
+                        if (response.correct) {
+                            setGameOver(true, "You guessed the word: " + guess + "!");
+                        } else {
+                            setRemainingAttempts(response.remaining_attempts);
+                            gameMessage = response.message;
+                            
+                            if (response.remaining_attempts == 0) {
+                                setGameOver(false, "Out of attempts!");
+                            } else {
+                                isMyTurn = false;  // Turn switches to opponent
+                            }
+                        }
+                    } catch (const std::exception& e) {
+                        gameMessage = std::string("Error: ") + e.what();
+                    }
                 }
             } else if (ch == KEY_BACKSPACE || ch == 127 || ch == 8) {
                 if (!wordInput.empty()) {
@@ -428,6 +487,12 @@ void PlayScreen::setGameOver(bool won, const std::string& message) {
 
 void PlayScreen::setGameMessage(const std::string& msg) {
     gameMessage = msg;
+}
+
+void PlayScreen::processNotifications() {
+    // These are declared in test.cpp as extern or we need access
+    // For now, we'll handle this in the main game loop in test.cpp
+    // This method is a placeholder that can be called from test.cpp
 }
 
 } // namespace hangman

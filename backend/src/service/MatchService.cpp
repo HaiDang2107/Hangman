@@ -55,6 +55,7 @@ std::string MatchService::getExposedPattern(const std::string& word, const std::
 GuessCharResult MatchService::guessChar(const C2S_GuessChar& request) {
     GuessCharResult result;
     result.success = false;
+    result.opponentFd = -1;
 
     std::string username;
     if (!AuthService::getInstance().validateSession(request.session_token, username)) {
@@ -91,9 +92,18 @@ GuessCharResult MatchService::guessChar(const C2S_GuessChar& request) {
     state.guessedChars.insert(request.ch);
 
     result.success = true;
+    result.guesserUsername = username;
     result.resultPacket.correct = correct;
     result.resultPacket.remaining_attempts = state.remainingAttempts;
     result.resultPacket.exposed_pattern = getExposedPattern(match.word, state.guessedChars);
+
+    // Find opponent
+    for (const auto& pair : match.playerStates) {
+        if (pair.first != username) {
+            result.opponentFd = AuthService::getInstance().getClientFd(pair.first);
+            break;
+        }
+    }
 
     // Check win/loss condition
     bool won = true;
@@ -124,6 +134,7 @@ GuessWordResult MatchService::guessWord(const C2S_GuessWord& request) {
     GuessWordResult result;
     result.success = false;
     result.gameEnded = false;
+    result.opponentFd = -1;
 
     std::string username;
     if (!AuthService::getInstance().validateSession(request.session_token, username)) {
@@ -152,8 +163,17 @@ GuessWordResult MatchService::guessWord(const C2S_GuessWord& request) {
     }
 
     result.success = true;
+    result.guesserUsername = username;
     result.resultPacket.correct = correct;
     result.resultPacket.remaining_attempts = state.remainingAttempts;
+    
+    // Find opponent
+    for (const auto& pair : match.playerStates) {
+        if (pair.first != username) {
+            result.opponentFd = AuthService::getInstance().getClientFd(pair.first);
+            break;
+        }
+    }
     
     if (correct) {
         result.resultPacket.message = "Correct! You win!";

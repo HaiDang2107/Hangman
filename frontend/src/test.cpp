@@ -7,6 +7,7 @@
 #include "ui/OnlineUsersDialog.h"
 #include "ui/InviteDialog.h"
 #include "ui/PlayScreen.h"
+#include "ui/DrawRequestDialog.h"
 #include "network/GameClient.h"
 #include <string>
 #include <iostream>
@@ -39,10 +40,39 @@ struct GameStartNotification {
     uint32_t wordLength;
 };
 
+struct GuessCharResultNotification {
+    bool correct;
+    std::string exposedPattern;
+    uint8_t remainingAttempts;
+    bool isOpponentGuess;  // true if this is opponent's guess result
+};
+
+struct GuessWordResultNotification {
+    bool correct;
+    std::string message;
+    uint8_t remainingAttempts;
+    bool isOpponentGuess;
+};
+
+struct DrawRequestNotification {
+    std::string fromUsername;
+    uint32_t matchId;
+};
+
+struct GameEndNotification {
+    uint32_t matchId;
+    uint8_t resultCode;
+    std::string summary;
+};
+
 std::queue<PendingInvite> g_pendingInvites;
 std::queue<InviteResponseNotification> g_inviteResponses;
 std::queue<PlayerReadyNotification> g_playerReadyUpdates;
 std::queue<GameStartNotification> g_gameStartNotifications;
+std::queue<GuessCharResultNotification> g_guessCharResults;
+std::queue<GuessWordResultNotification> g_guessWordResults;
+std::queue<DrawRequestNotification> g_drawRequests;
+std::queue<GameEndNotification> g_gameEndNotifications;
 std::mutex g_notificationMutex;
 
 enum class AppScreen {
@@ -186,6 +216,44 @@ int main() {
             gameStart.room_id,
             gameStart.opponent_username,
             gameStart.word_length
+        });
+    });
+    
+    // Gameplay notification handlers
+    client.setGuessCharResultHandler([](const S2C_GuessCharResult& result) {
+        std::lock_guard<std::mutex> lock(g_notificationMutex);
+        g_guessCharResults.push({
+            result.correct,
+            result.exposed_pattern,
+            result.remaining_attempts,
+            true  // This is opponent's guess
+        });
+    });
+    
+    client.setGuessWordResultHandler([](const S2C_GuessWordResult& result) {
+        std::lock_guard<std::mutex> lock(g_notificationMutex);
+        g_guessWordResults.push({
+            result.correct,
+            result.message,
+            result.remaining_attempts,
+            true  // This is opponent's guess
+        });
+    });
+    
+    client.setDrawRequestHandler([](const S2C_DrawRequest& request) {
+        std::lock_guard<std::mutex> lock(g_notificationMutex);
+        g_drawRequests.push({
+            request.from_username,
+            request.match_id
+        });
+    });
+    
+    client.setGameEndHandler([](const S2C_GameEnd& gameEnd) {
+        std::lock_guard<std::mutex> lock(g_notificationMutex);
+        g_gameEndNotifications.push({
+            gameEnd.match_id,
+            gameEnd.result_code,
+            gameEnd.summary
         });
     });
     
@@ -831,6 +899,93 @@ int main() {
                 
                 bool inGame = true;
                 while (inGame) {
+                    // Check for notifications with try_lock to avoid blocking
+                    {
+                        std::unique_lock<std::mutex> lock(g_notificationMutex, std::try_to_lock);
+                        if (lock.owns_lock()) {
+                            // Check guess char results (opponent's guess)
+                            if (!g_guessCharResults.empty()) {
+                                auto result = g_guessCharResults.front();
+                                g_guessCharResults.pop();
+                                
+                                if (result.isOpponentGuess) {
+                                    playScreen.updateWordPattern(result.exposedPattern);
+                                    playScreen.setRemainingAttempts(result.remainingAttempts);
+                                    
+                                    if (result.correct) {
+                                        playScreen.setGameMessage("Opponent guessed correctly!");
+                                    } else {
+                                        playScreen.setGameMessage("Opponent guessed wrong!");
+                                    }
+                                    
+                                    // Now it's our turn
+                                    playScreen.setMyTurn(true);
+                                }
+                            }
+                            
+                            // Check guess word results (opponent's guess)
+                            if (!g_guessWordResults.empty()) {
+                                auto result = g_guessWordResults.front();
+                                g_guessWordResults.pop();
+                                
+                                if (result.isOpponentGuess) {
+                                    if (result.correct) {
+                                        playScreen.setGameOver(false, "Opponent guessed the word!");
+                                    } else {
+                                        playScreen.setRemainingAttempts(result.remainingAttempts);
+                                        playScreen.setGameMessage("Opponent's word guess was wrong!");
+                                        playScreen.setMyTurn(true);
+                                    }
+                                }
+                            }
+                            
+                            // Check draw requests
+                            if (!g_drawRequests.empty()) {
+                                auto request = g_drawRequests.front();
+                                g_drawRequests.pop();
+                                
+                                // Release lock before showing dialog
+                                lock.unlock();
+                                
+                                DrawRequestDialog drawDialog(request.fromUsername);
+                                bool accepted = drawDialog.show();
+                                
+                                if (accepted) {
+                                    // Send accept - end game as draw (result_code=3)
+                                    try {
+                                        auto& client = GameClient::getInstance();
+                                        client.endGame(g_gameSession.roomId, g_gameSession.matchId, 3, "Draw accepted");
+                                        playScreen.setGameOver(true, "Game ended in a draw");
+                                    } catch (const std::exception& e) {
+                                        playScreen.setGameMessage(std::string("Error: ") + e.what());
+                                    }
+                                } else {
+                                    playScreen.setGameMessage("Draw request declined");
+                                }
+                                
+                                // Reacquire lock for next iteration
+                                lock.lock();
+                            }
+                            
+                            // Check game end notifications
+                            if (!g_gameEndNotifications.empty()) {
+                                auto gameEnd = g_gameEndNotifications.front();
+                                g_gameEndNotifications.pop();
+                                
+                                // result_code: 0 = resignation, 1 = win, 2 = loss, 3 = draw
+                                if (gameEnd.resultCode == 0) {
+                                    playScreen.setGameOver(true, "Opponent resigned - You win!");
+                                } else if (gameEnd.resultCode == 1) {
+                                    playScreen.setGameOver(false, "You lost!");
+                                } else if (gameEnd.resultCode == 2) {
+                                    playScreen.setGameOver(true, "You won!");
+                                } else if (gameEnd.resultCode == 3) {
+                                    playScreen.setGameOver(true, "Game ended in a draw");
+                                }
+                            }
+                        }
+                    }
+                    
                     playScreen.draw();
                     int result = playScreen.handleInput();
                     

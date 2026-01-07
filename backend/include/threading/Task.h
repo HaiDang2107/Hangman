@@ -235,6 +235,7 @@ public:
     void execute() override;
     int getClientFd() const override { return clientFd; }
     std::vector<uint8_t> getResponsePacket() const override;
+    std::vector<std::pair<int, std::vector<uint8_t>>> getBroadcastPackets() const override;
 
 private:
     int clientFd;
@@ -242,6 +243,7 @@ private:
     S2C_GuessCharResult result;
     S2C_Error error;
     bool success;
+    std::vector<std::pair<int, std::vector<uint8_t>>> broadcastPackets;
 };
 
 // ============ Guess Word Task ============
@@ -253,6 +255,7 @@ public:
     void execute() override;
     int getClientFd() const override { return clientFd; }
     std::vector<uint8_t> getResponsePacket() const override;
+    std::vector<std::pair<int, std::vector<uint8_t>>> getBroadcastPackets() const override;
 
 private:
     int clientFd;
@@ -260,6 +263,7 @@ private:
     S2C_GuessWordResult result;
     S2C_Error error;
     bool success;
+    std::vector<std::pair<int, std::vector<uint8_t>>> broadcastPackets;
 };
 
 // ============ Request Draw Task ============

@@ -4,6 +4,7 @@
 #include <string>
 #include <set>
 #include <vector>
+#include "network/GameClient.h"
 
 namespace hangman {
 
@@ -61,6 +62,9 @@ public:
     
     void draw();
     int handleInput();  // Returns: -1 = exit game, 0 = continue
+    
+    // Check and process notifications (call this in game loop)
+    void processNotifications();
     
     // Game state updates
     void updateWordPattern(const std::string& pattern);

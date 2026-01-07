@@ -17,6 +17,10 @@ using InviteReceivedHandler = std::function<void(const S2C_InviteReceived&)>;
 using InviteResponseHandler = std::function<void(const S2C_InviteResponse&)>;
 using PlayerReadyUpdateHandler = std::function<void(const S2C_PlayerReadyUpdate&)>;
 using GameStartHandler = std::function<void(const S2C_GameStart&)>;
+using GuessCharResultHandler = std::function<void(const S2C_GuessCharResult&)>;
+using GuessWordResultHandler = std::function<void(const S2C_GuessWordResult&)>;
+using DrawRequestHandler = std::function<void(const S2C_DrawRequest&)>;
+using GameEndHandler = std::function<void(const S2C_GameEnd&)>;
 
 class GameClient {
 public:
@@ -50,6 +54,12 @@ public:
     S2C_Ack setReady(uint32_t roomId, bool ready);
     S2C_Ack startGame(uint32_t roomId);
     
+    // Gameplay actions
+    S2C_GuessCharResult guessChar(uint32_t roomId, uint32_t matchId, char ch);
+    S2C_GuessWordResult guessWord(uint32_t roomId, uint32_t matchId, const std::string& word);
+    void requestDraw(uint32_t roomId, uint32_t matchId);
+    S2C_GameEnd endGame(uint32_t roomId, uint32_t matchId, uint8_t resultCode, const std::string& message);
+    
     // Event loop management
     void startEventLoop();
     void stopEventLoop();
@@ -59,6 +69,10 @@ public:
     void setInviteResponseHandler(InviteResponseHandler handler) { onInviteResponse = handler; }
     void setPlayerReadyUpdateHandler(PlayerReadyUpdateHandler handler) { onPlayerReadyUpdate = handler; }
     void setGameStartHandler(GameStartHandler handler) { onGameStart = handler; }
+    void setGuessCharResultHandler(GuessCharResultHandler handler) { onGuessCharResult = handler; }
+    void setGuessWordResultHandler(GuessWordResultHandler handler) { onGuessWordResult = handler; }
+    void setDrawRequestHandler(DrawRequestHandler handler) { onDrawRequest = handler; }
+    void setGameEndHandler(GameEndHandler handler) { onGameEnd = handler; }
     
     // Get current session token
     const std::string& getSessionToken() const { return sessionToken; }
@@ -89,6 +103,10 @@ private:
     InviteResponseHandler onInviteResponse;
     PlayerReadyUpdateHandler onPlayerReadyUpdate;
     GameStartHandler onGameStart;
+    GuessCharResultHandler onGuessCharResult;
+    GuessWordResultHandler onGuessWordResult;
+    DrawRequestHandler onDrawRequest;
+    GameEndHandler onGameEnd;
 };
 
 } // namespace hangman

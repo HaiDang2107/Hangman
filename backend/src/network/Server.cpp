@@ -385,9 +385,15 @@ namespace hangman
     // Send response được sử dụng bổi eventloop dưới sự hướng dẫn của workerthread
     void Server::sendResponse(int clientFd, const std::vector<uint8_t> &packet)
     {
+        if (packet.empty()) {
+            std::cerr << "WARNING: Attempt to send empty packet to client " << clientFd << std::endl;
+            return;
+        }
+        
         auto it = connections.find(clientFd);
         if (it == connections.end())
         {
+            std::cerr << "WARNING: Connection not found for client " << clientFd << std::endl;
             return;
         }
 
@@ -435,6 +441,11 @@ namespace hangman
                 auto callback = std::make_shared<FunctionCallback>(
                     [task, this]()
                     {
+                        if (!task) {
+                            std::cerr << "ERROR: Task is null in callback" << std::endl;
+                            return;
+                        }
+                        
                         std::cerr << "DEBUG: Callback executing for client " << task->getClientFd() << std::endl;
                         
                         // 1. Send response to requester
@@ -456,8 +467,13 @@ namespace hangman
                             int targetFd = p.first;
                             const auto& data = p.second;
                             std::cerr << "DEBUG: Broadcasting to fd=" << targetFd << ", size=" << data.size() << std::endl;
-                            sendResponse(targetFd, data);
-                            std::cerr << "Broadcasted to client " << targetFd << std::endl;
+                            
+                            if (!data.empty() && targetFd >= 0) {
+                                sendResponse(targetFd, data);
+                                std::cerr << "Broadcasted to client " << targetFd << std::endl;
+                            } else {
+                                std::cerr << "WARNING: Skipped invalid broadcast (fd=" << targetFd << ", size=" << data.size() << ")" << std::endl;
+                            }
                         }
                         
                         std::cerr << "DEBUG: Callback finished" << std::endl;

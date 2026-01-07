@@ -241,6 +241,49 @@ S2C_Ack GameClient::startGame(uint32_t roomId) {
     return result;
 }
 
+S2C_GuessCharResult GameClient::guessChar(uint32_t roomId, uint32_t matchId, char ch) {
+    C2S_GuessChar request;
+    request.session_token = sessionToken;
+    request.room_id = roomId;
+    request.match_id = matchId;
+    request.ch = ch;
+    
+    return sendAndReceive<S2C_GuessCharResult>(request.to_bytes());
+}
+
+S2C_GuessWordResult GameClient::guessWord(uint32_t roomId, uint32_t matchId, const std::string& word) {
+    C2S_GuessWord request;
+    request.session_token = sessionToken;
+    request.room_id = roomId;
+    request.match_id = matchId;
+    request.word = word;
+    
+    return sendAndReceive<S2C_GuessWordResult>(request.to_bytes());
+}
+
+void GameClient::requestDraw(uint32_t roomId, uint32_t matchId) {
+    C2S_RequestDraw request;
+    request.session_token = sessionToken;
+    request.room_id = roomId;
+    request.match_id = matchId;
+    
+    // Fire and forget - response will come as notification
+    std::lock_guard<std::mutex> lock(socketMutex);
+    auto packet = request.to_bytes();
+    socket->send(packet.data(), packet.size());
+}
+
+S2C_GameEnd GameClient::endGame(uint32_t roomId, uint32_t matchId, uint8_t resultCode, const std::string& message) {
+    C2S_EndGame request;
+    request.session_token = sessionToken;
+    request.room_id = roomId;
+    request.match_id = matchId;
+    request.result_code = resultCode;
+    request.message = message;
+    
+    return sendAndReceive<S2C_GameEnd>(request.to_bytes());
+}
+
 void GameClient::startEventLoop() {
     if (eventLoopRunning) return;
     
@@ -330,6 +373,34 @@ void GameClient::handleNotification(const PacketHeader& header) {
                 auto packet = S2C_GameStart::from_payload(bb);
                 onGameStart(packet);
             } else {
+            }
+            break;
+            
+        case PacketType::S2C_GuessCharResult:
+            if (onGuessCharResult) {
+                auto packet = S2C_GuessCharResult::from_payload(bb);
+                onGuessCharResult(packet);
+            }
+            break;
+            
+        case PacketType::S2C_GuessWordResult:
+            if (onGuessWordResult) {
+                auto packet = S2C_GuessWordResult::from_payload(bb);
+                onGuessWordResult(packet);
+            }
+            break;
+            
+        case PacketType::S2C_DrawRequest:
+            if (onDrawRequest) {
+                auto packet = S2C_DrawRequest::from_payload(bb);
+                onDrawRequest(packet);
+            }
+            break;
+            
+        case PacketType::S2C_GameEnd:
+            if (onGameEnd) {
+                auto packet = S2C_GameEnd::from_payload(bb);
+                onGameEnd(packet);
             }
             break;
             

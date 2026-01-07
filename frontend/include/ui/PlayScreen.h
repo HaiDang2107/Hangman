@@ -49,6 +49,7 @@ private:
     void drawOptionsMenu(int y, int x);
     void drawInputPrompt();
     void drawGameOverScreen();
+    void initInput();  // Initialize input settings with timeout
     
 public:
     PlayScreen(const std::string& roomName,

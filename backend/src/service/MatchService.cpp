@@ -52,6 +52,37 @@ std::string MatchService::getExposedPattern(const std::string& word, const std::
     return pattern;
 }
 
+std::string MatchService::getOpponentPattern(uint32_t roomId, const std::string& guesserUsername, 
+                                             char guessedChar, bool wasCorrect) {
+    std::lock_guard<std::mutex> lock(matchesMutex);
+    auto it = matches.find(roomId);
+    if (it == matches.end()) return "";
+    
+    Match& match = it->second;
+    
+    // Find opponent
+    std::string opponentName;
+    for (const auto& pair : match.playerStates) {
+        if (pair.first != guesserUsername) {
+            opponentName = pair.first;
+            break;
+        }
+    }
+    
+    if (opponentName.empty()) return "";
+    
+    PlayerMatchState& opponentState = match.playerStates[opponentName];
+    
+    // If the guess was correct, add it to opponent's guessed chars too
+    // so opponent can see the revealed letter
+    if (wasCorrect) {
+        opponentState.guessedChars.insert(guessedChar);
+    }
+    
+    // Generate pattern based on opponent's guessed chars
+    return getExposedPattern(match.word, opponentState.guessedChars);
+}
+
 GuessCharResult MatchService::guessChar(const C2S_GuessChar& request) {
     GuessCharResult result;
     result.success = false;

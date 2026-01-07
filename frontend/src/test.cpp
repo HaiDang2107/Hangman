@@ -899,6 +899,9 @@ int main() {
                 
                 bool inGame = true;
                 while (inGame) {
+                    // Always draw first to show current state
+                    playScreen.draw();
+                    
                     // Check for notifications with try_lock to avoid blocking
                     {
                         std::unique_lock<std::mutex> lock(g_notificationMutex, std::try_to_lock);
@@ -920,6 +923,9 @@ int main() {
                                     
                                     // Now it's our turn
                                     playScreen.setMyTurn(true);
+                                    
+                                    // Redraw immediately to show changes
+                                    playScreen.draw();
                                 }
                             }
                             
@@ -936,6 +942,9 @@ int main() {
                                         playScreen.setGameMessage("Opponent's word guess was wrong!");
                                         playScreen.setMyTurn(true);
                                     }
+                                    
+                                    // Redraw immediately to show changes
+                                    playScreen.draw();
                                 }
                             }
                             
@@ -963,6 +972,9 @@ int main() {
                                     playScreen.setGameMessage("Draw request declined");
                                 }
                                 
+                                // Redraw after dialog
+                                playScreen.draw();
+                                
                                 // Reacquire lock for next iteration
                                 lock.lock();
                             }
@@ -982,11 +994,13 @@ int main() {
                                 } else if (gameEnd.resultCode == 3) {
                                     playScreen.setGameOver(true, "Game ended in a draw");
                                 }
+                                
+                                // Redraw immediately to show changes
+                                playScreen.draw();
                             }
                         }
                     }
                     
-                    playScreen.draw();
                     int result = playScreen.handleInput();
                     
                     if (result == -1) {

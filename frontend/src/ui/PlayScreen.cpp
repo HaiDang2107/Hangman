@@ -36,6 +36,14 @@ PlayScreen::PlayScreen(const std::string& roomName,
     if (!wordPattern.empty()) wordPattern.pop_back();
     
     gameMessage = "Game started! Good luck!";
+    
+    // Initialize input with timeout for real-time updates
+    initInput();
+}
+
+void PlayScreen::initInput() {
+    // halfdelay mode: getch() waits max 1 decisecond (100ms)
+    halfdelay(1);  // 1 decisecond = 100ms
 }
 
 void PlayScreen::drawHangman(int y, int x, int wrongGuesses) {
@@ -277,11 +285,17 @@ void PlayScreen::draw() {
 
 int PlayScreen::handleInput() {
     if (gameOver) {
+        cbreak();  // Reset to normal mode
         getch();  // Wait for any key
         return -1;  // Exit to menu
     }
     
     int ch = getch();
+    
+    // Handle timeout (ERR means no input within timeout period)
+    if (ch == ERR) {
+        return 0;  // No input, just continue (allows notifications to be processed)
+    }
     
     // Handle different input modes
     switch (inputMode) {

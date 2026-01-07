@@ -69,6 +69,10 @@ public:
 
     // End Game (Resign or explicit end)
     EndGameResult endGame(const C2S_EndGame& request);
+    
+    // Get opponent's exposed pattern after a guess
+    std::string getOpponentPattern(uint32_t roomId, const std::string& guesserUsername, 
+                                   char guessedChar, bool wasCorrect);
 
 private:
     MatchService() = default;

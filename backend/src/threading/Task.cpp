@@ -231,10 +231,15 @@ void GuessCharTask::execute() {
         
         // Broadcast to opponent about the guess (only if opponent is different from requester)
         if (res.opponentFd != -1 && res.opponentFd != clientFd) {
+            // Get opponent's pattern from MatchService
+            auto opponentPattern = MatchService::getInstance().getOpponentPattern(
+                request.room_id, res.guesserUsername, request.ch, res.resultPacket.correct
+            );
+            
             // Create a notification packet for opponent
             S2C_GuessCharResult opponentNotif;
             opponentNotif.correct = res.resultPacket.correct;
-            opponentNotif.exposed_pattern = res.resultPacket.exposed_pattern;
+            opponentNotif.exposed_pattern = opponentPattern;
             opponentNotif.remaining_attempts = res.resultPacket.remaining_attempts;
             
             broadcastPackets.push_back({res.opponentFd, opponentNotif.to_bytes()});

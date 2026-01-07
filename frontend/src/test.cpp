@@ -179,12 +179,15 @@ int main() {
     });
     
     client.setGameStartHandler([](const S2C_GameStart& gameStart) {
+        std::cerr << "[HANDLER] GameStart handler called, acquiring mutex..." << std::endl;
         std::lock_guard<std::mutex> lock(g_notificationMutex);
+        std::cerr << "[HANDLER] Mutex acquired, pushing to queue..." << std::endl;
         g_gameStartNotifications.push({
             gameStart.room_id,
             gameStart.opponent_username,
             gameStart.word_length
         });
+        std::cerr << "[HANDLER] Pushed to queue, handler done" << std::endl;
     });
     
     LoginScreen loginScreen;
@@ -279,16 +282,23 @@ int main() {
             
             case AppScreen::MAIN_MENU: {
                 // Check for pending invitations
+                PendingInvite invite;
+                bool hasInvite = false;
                 {
                     std::lock_guard<std::mutex> lock(g_notificationMutex);
                     if (!g_pendingInvites.empty()) {
-                        auto invite = g_pendingInvites.front();
+                        invite = g_pendingInvites.front();
                         g_pendingInvites.pop();
-                        
-                        // std::cerr << "[DEBUG] Showing invite dialog..." << std::endl;
-                        // Show invite dialog
-                        InviteDialog inviteDialog(invite.fromUsername, invite.roomId);
-                        int inviteResult = inviteDialog.show();
+                        hasInvite = true;
+                    }
+                }
+                
+                if (hasInvite) {
+                    // Process invite OUTSIDE of mutex lock
+                    // std::cerr << "[DEBUG] Showing invite dialog..." << std::endl;
+                    // Show invite dialog
+                    InviteDialog inviteDialog(invite.fromUsername, invite.roomId);
+                    int inviteResult = inviteDialog.show();
                         // std::cerr << "[DEBUG] Invite dialog returned: " << inviteResult << std::endl;
                         
                         // CRITICAL: Reset ncurses state after dialog
@@ -363,10 +373,11 @@ int main() {
                                         // Continue without checking, will check next iteration
                                     } else {
                                         if (!g_gameStartNotifications.empty()) {
+                                            std::cerr << "[GUEST] Found game start notification in queue!" << std::endl;
                                             auto gameStartInfo = g_gameStartNotifications.front();
                                             g_gameStartNotifications.pop();
-                                            g_gameStartNotifications.pop();
                                         
+                                            std::cerr << "[GUEST] Transitioning to PLAY screen..." << std::endl;
                                             // Game started! Transition to play screen
                                             showMessage("Game Started!", "Host has started the game!", 2);
                                             napms(1500);
@@ -378,11 +389,9 @@ int main() {
                                             g_gameSession.wordLength = gameStartInfo.wordLength;
                                             g_gameSession.isHost = false;
                                             
-                                            // Restart event loop before going to play screen
-                                            client.startEventLoop();
-                                            
                                             inGuestRoom = false;
                                             currentScreen = AppScreen::PLAY;
+                                            std::cerr << "[GUEST] Breaking out of guest room loop" << std::endl;
                                             break; // Exit loop immediately
                                         }
                                     }
@@ -506,18 +515,14 @@ int main() {
                                 }
                             }
                             
-                            // Restart event loop before going back to main menu
-                            // std::cerr << "[DEBUG] Guest exited room loop, restarting event loop..." << std::endl;
-                            client.startEventLoop();
-                            // std::cerr << "[DEBUG] Event loop restarted, going back to main menu" << std::endl;
-                            
-                            // After leaving room, back to main menu
-                            currentScreen = AppScreen::MAIN_MENU;
+                            // After leaving room, back to main menu (only if not transitioning to PLAY)
+                            if (currentScreen != AppScreen::PLAY) {
+                                currentScreen = AppScreen::MAIN_MENU;
+                            }
                         } else {
                             // Declined - send response without waiting
                             client.respondInvite(invite.fromUsername, false);
                         }
-                    }
                 }
                 
                 mainMenuScreen.draw();

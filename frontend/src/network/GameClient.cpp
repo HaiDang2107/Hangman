@@ -193,12 +193,11 @@ S2C_CreateRoomResult GameClient::respondInvite(const std::string& fromUsername, 
     auto result = sendAndReceive<S2C_CreateRoomResult>(request.to_bytes());
     std::cerr << "DEBUG: Received response, code=" << static_cast<int>(result.code) << std::endl;
     
-    // DO NOT restart event loop here - let caller manage it
-    // Guest room needs event loop STOPPED for clean input handling
-    // if (wasRunning) {
-    //     std::cerr << "DEBUG: Restarting event loop..." << std::endl;
-    //     startEventLoop();
-    // }
+    // Restart event loop if it was running
+    if (wasRunning) {
+        std::cerr << "DEBUG: Restarting event loop..." << std::endl;
+        startEventLoop();
+    }
     
     return result;
 }
@@ -335,9 +334,14 @@ void GameClient::handleNotification(const PacketHeader& header) {
             break;
             
         case PacketType::S2C_GameStart:
+            std::cerr << "DEBUG: Processing S2C_GameStart notification" << std::endl;
             if (onGameStart) {
                 auto packet = S2C_GameStart::from_payload(bb);
+                std::cerr << "DEBUG: Calling onGameStart handler" << std::endl;
                 onGameStart(packet);
+                std::cerr << "DEBUG: onGameStart handler returned" << std::endl;
+            } else {
+                std::cerr << "ERROR: onGameStart handler is NULL!" << std::endl;
             }
             break;
             

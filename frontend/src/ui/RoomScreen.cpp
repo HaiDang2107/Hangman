@@ -331,7 +331,6 @@ int RoomScreen::handleInput() {
     
     // Only log actual input, not timeouts
     if (ch != ERR && ch != KEY_RESIZE) {
-        std::cerr << "[INPUT] Got key: " << ch << " (char: '" << (char)ch << "')" << std::endl;
     }
     
     // Debug logging

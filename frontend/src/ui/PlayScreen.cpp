@@ -18,12 +18,11 @@ PlayScreen::PlayScreen(const std::string& roomName,
 void PlayScreen::draw() {
     clear();
     
-    // Title
+    // Title with simple ASCII
     attron(COLOR_PAIR(2) | A_BOLD);
-    std::string title = "╔════════════════════════════════════════╗";
-    mvprintw(2, (COLS - title.length()) / 2, "%s", title.c_str());
-    mvprintw(3, (COLS - 42) / 2, "║          HANGMAN GAME - PLAYING        ║");
-    mvprintw(4, (COLS - title.length()) / 2, "╚════════════════════════════════════════╝");
+    mvprintw(2, (COLS - 44) / 2, "+------------------------------------------+");
+    mvprintw(3, (COLS - 44) / 2, "|       HANGMAN GAME - IN PROGRESS        |");
+    mvprintw(4, (COLS - 44) / 2, "+------------------------------------------+");
     attroff(COLOR_PAIR(2) | A_BOLD);
     
     // Room info
@@ -43,12 +42,12 @@ void PlayScreen::draw() {
     // Hangman display area
     int hangmanY = centerY + 3;
     attron(COLOR_PAIR(1));
-    mvprintw(hangmanY, COLS / 2 - 10, "┌───────────────────┐");
-    mvprintw(hangmanY + 1, COLS / 2 - 10, "│                   │");
-    mvprintw(hangmanY + 2, COLS / 2 - 10, "│   HANGMAN AREA    │");
-    mvprintw(hangmanY + 3, COLS / 2 - 10, "│   (Coming Soon)   │");
-    mvprintw(hangmanY + 4, COLS / 2 - 10, "│                   │");
-    mvprintw(hangmanY + 5, COLS / 2 - 10, "└───────────────────┘");
+    mvprintw(hangmanY,     COLS / 2 - 10, "+-------------------+");
+    mvprintw(hangmanY + 1, COLS / 2 - 10, "|                   |");
+    mvprintw(hangmanY + 2, COLS / 2 - 10, "|   HANGMAN AREA    |");
+    mvprintw(hangmanY + 3, COLS / 2 - 10, "|   (Coming Soon)   |");
+    mvprintw(hangmanY + 4, COLS / 2 - 10, "|                   |");
+    mvprintw(hangmanY + 5, COLS / 2 - 10, "+-------------------+");
     attroff(COLOR_PAIR(1));
     
     // Word display area

@@ -183,19 +183,15 @@ S2C_CreateRoomResult GameClient::respondInvite(const std::string& fromUsername, 
     
     // If accepting, wait for S2C_CreateRoomResult (join room result)
     // Temporarily stop event loop to avoid race condition
-    std::cerr << "DEBUG: Stopping event loop for respondInvite..." << std::endl;
     bool wasRunning = eventLoopRunning;
     if (wasRunning) {
         stopEventLoop();
     }
     
-    std::cerr << "DEBUG: Sending respondInvite packet and waiting for response..." << std::endl;
     auto result = sendAndReceive<S2C_CreateRoomResult>(request.to_bytes());
-    std::cerr << "DEBUG: Received response, code=" << static_cast<int>(result.code) << std::endl;
     
     // Restart event loop if it was running
     if (wasRunning) {
-        std::cerr << "DEBUG: Restarting event loop..." << std::endl;
         startEventLoop();
     }
     
@@ -305,17 +301,13 @@ void GameClient::handleNotification(const PacketHeader& header) {
     ByteBuffer bb;
     bb.buf = payload;
     
-    std::cerr << "DEBUG: handleNotification - PacketType: " << static_cast<int>(header.type) << std::endl;
     
     switch (header.type) {
         case PacketType::S2C_InviteReceived:
-            std::cerr << "DEBUG: Processing S2C_InviteReceived" << std::endl;
             if (onInviteReceived) {
                 auto packet = S2C_InviteReceived::from_payload(bb);
-                std::cerr << "DEBUG: Calling onInviteReceived handler" << std::endl;
                 onInviteReceived(packet);
             } else {
-                std::cerr << "DEBUG: No onInviteReceived handler set!" << std::endl;
             }
             break;
             
@@ -334,14 +326,10 @@ void GameClient::handleNotification(const PacketHeader& header) {
             break;
             
         case PacketType::S2C_GameStart:
-            std::cerr << "DEBUG: Processing S2C_GameStart notification" << std::endl;
             if (onGameStart) {
                 auto packet = S2C_GameStart::from_payload(bb);
-                std::cerr << "DEBUG: Calling onGameStart handler" << std::endl;
                 onGameStart(packet);
-                std::cerr << "DEBUG: onGameStart handler returned" << std::endl;
             } else {
-                std::cerr << "ERROR: onGameStart handler is NULL!" << std::endl;
             }
             break;
             

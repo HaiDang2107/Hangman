@@ -179,15 +179,12 @@ int main() {
     });
     
     client.setGameStartHandler([](const S2C_GameStart& gameStart) {
-        std::cerr << "[HANDLER] GameStart handler called, acquiring mutex..." << std::endl;
         std::lock_guard<std::mutex> lock(g_notificationMutex);
-        std::cerr << "[HANDLER] Mutex acquired, pushing to queue..." << std::endl;
         g_gameStartNotifications.push({
             gameStart.room_id,
             gameStart.opponent_username,
             gameStart.word_length
         });
-        std::cerr << "[HANDLER] Pushed to queue, handler done" << std::endl;
     });
     
     LoginScreen loginScreen;
@@ -373,11 +370,9 @@ int main() {
                                         // Continue without checking, will check next iteration
                                     } else {
                                         if (!g_gameStartNotifications.empty()) {
-                                            std::cerr << "[GUEST] Found game start notification in queue!" << std::endl;
                                             auto gameStartInfo = g_gameStartNotifications.front();
                                             g_gameStartNotifications.pop();
                                         
-                                            std::cerr << "[GUEST] Transitioning to PLAY screen..." << std::endl;
                                             // Game started! Transition to play screen
                                             showMessage("Game Started!", "Host has started the game!", 2);
                                             napms(1500);
@@ -391,7 +386,6 @@ int main() {
                                             
                                             inGuestRoom = false;
                                             currentScreen = AppScreen::PLAY;
-                                            std::cerr << "[GUEST] Breaking out of guest room loop" << std::endl;
                                             break; // Exit loop immediately
                                         }
                                     }

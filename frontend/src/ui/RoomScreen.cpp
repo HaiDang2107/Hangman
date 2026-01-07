@@ -5,20 +5,32 @@
 void RoomScreen::initWindows() {
     // Get screen size
     getmaxyx(stdscr, height, width);
-    
+    std::cerr << "[DEBUG RoomScreen] initWindows: stdscr size " << width << "x" << height << std::endl;
+
     // Create main window
     mainWin = newwin(height, width, 0, 0);
+    if (!mainWin) {
+        std::cerr << "[ERROR RoomScreen] Failed to create mainWin!" << std::endl;
+        return;
+    }
     keypad(mainWin, TRUE);
+    std::cerr << "[DEBUG RoomScreen] mainWin created successfully: " << mainWin << std::endl;
     // No timeout by default - screens will be responsive
-    
+
     // Create player windows - positioned after compact title
     int playerY = 4;
     int spacing = 3;
     int totalWidth = 2 * PLAYER_BOX_WIDTH + spacing;
     int startX = (width - totalWidth) / 2;
-    
+
     player1Win = newwin(PLAYER_BOX_HEIGHT, PLAYER_BOX_WIDTH, playerY, startX);
     player2Win = newwin(PLAYER_BOX_HEIGHT, PLAYER_BOX_WIDTH, playerY, startX + PLAYER_BOX_WIDTH + spacing);
+
+    if (!player1Win || !player2Win) {
+        std::cerr << "[ERROR RoomScreen] Failed to create player windows!" << std::endl;
+    } else {
+        std::cerr << "[DEBUG RoomScreen] Player windows created successfully" << std::endl;
+    }
 }
 
 void RoomScreen::cleanupWindows() {
@@ -304,7 +316,16 @@ void RoomScreen::handleResize() {
 }
 
 int RoomScreen::handleInput() {
+    // Ensure window is ready for input
+    touchwin(mainWin);
+    wrefresh(mainWin);
+    
     int ch = wgetch(mainWin);
+    
+    // Only log actual input, not timeouts
+    if (ch != ERR && ch != KEY_RESIZE) {
+        std::cerr << "[INPUT] Got key: " << ch << " (char: '" << (char)ch << "')" << std::endl;
+    }
     
     // Debug logging
     if (ch != ERR) {

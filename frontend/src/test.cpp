@@ -6,6 +6,7 @@
 #include "ui/CreateRoomDialog.h"
 #include "ui/OnlineUsersDialog.h"
 #include "ui/InviteDialog.h"
+#include "ui/PlayScreen.h"
 #include "network/GameClient.h"
 #include <string>
 #include <iostream>
@@ -32,9 +33,16 @@ struct PlayerReadyNotification {
     bool ready;
 };
 
+struct GameStartNotification {
+    uint32_t roomId;
+    std::string opponentUsername;
+    uint32_t wordLength;
+};
+
 std::queue<PendingInvite> g_pendingInvites;
 std::queue<InviteResponseNotification> g_inviteResponses;
 std::queue<PlayerReadyNotification> g_playerReadyUpdates;
+std::queue<GameStartNotification> g_gameStartNotifications;
 std::mutex g_notificationMutex;
 
 enum class AppScreen {
@@ -44,6 +52,7 @@ enum class AppScreen {
     CREATE_ROOM,
     MATCH_HISTORY,
     RANKINGS,
+    PLAY,
     EXIT
 };
 
@@ -54,6 +63,15 @@ struct UserData {
     int wins;
     int losses;
 };
+
+// Global game session data (for transitioning to play screen)
+struct GameSession {
+    std::string roomName;
+    std::string hostUsername;
+    std::string guestUsername;
+    uint32_t wordLength;
+    bool isHost;
+} g_gameSession;
 
 void initNcurses() {
     initscr();
@@ -160,6 +178,15 @@ int main() {
         g_playerReadyUpdates.push({update.username, update.ready});
     });
     
+    client.setGameStartHandler([](const S2C_GameStart& gameStart) {
+        std::lock_guard<std::mutex> lock(g_notificationMutex);
+        g_gameStartNotifications.push({
+            gameStart.room_id,
+            gameStart.opponent_username,
+            gameStart.word_length
+        });
+    });
+    
     LoginScreen loginScreen;
     SignUpScreen signupScreen;
     MainMenuScreen mainMenuScreen;
@@ -258,16 +285,27 @@ int main() {
                         auto invite = g_pendingInvites.front();
                         g_pendingInvites.pop();
                         
+                        // std::cerr << "[DEBUG] Showing invite dialog..." << std::endl;
                         // Show invite dialog
                         InviteDialog inviteDialog(invite.fromUsername, invite.roomId);
                         int inviteResult = inviteDialog.show();
+                        // std::cerr << "[DEBUG] Invite dialog returned: " << inviteResult << std::endl;
+                        
+                        // CRITICAL: Reset ncurses state after dialog
+                        cbreak();       // Disable line buffering
+                        noecho();       // Don't echo typed characters
+                        curs_set(0);    // Hide cursor
+                        flushinp();     // Clear input buffer
+                        // std::cerr << "[DEBUG] Terminal mode reset after dialog" << std::endl;
                         
                         if (inviteResult == 1) {
                             // Accepted - send response and wait for result
-                            showMessage("Joining Room...", "Please wait...", 2);
+                            // std::cerr << "[DEBUG] Guest accepted invite from: " << invite.fromUsername << std::endl;
                             
                             // This will block until server responds with S2C_JoinRoomResult
+                            // std::cerr << "[DEBUG] Calling respondInvite..." << std::endl;
                             auto joinResult = client.respondInvite(invite.fromUsername, true);
+                            // std::cerr << "[DEBUG] respondInvite returned, code: " << static_cast<int>(joinResult.code) << std::endl;
                             
                             if (joinResult.code != ResultCode::SUCCESS) {
                                 showMessage("Error", "Failed to join room: " + joinResult.message, 6);
@@ -275,32 +313,107 @@ int main() {
                                 continue;
                             }
                             
-                            // Clear the "Joining Room..." message
+                            // Event loop is already stopped by respondInvite(), no need to stop again
+                            // std::cerr << "[DEBUG] Event loop should be STOPPED now" << std::endl;
+                            // std::cerr << "[DEBUG] Join successful! Preparing for room screen..." << std::endl;
+                            
+                            // Clear screen but DON'T call endwin() - it destroys ncurses state
                             clear();
                             refresh();
+                            flushinp(); // Clear input buffer
                             
                             // Successfully joined - navigate to room screen as guest
+                            // std::cerr << "[DEBUG] Creating guest room screen..." << std::endl;
                             // Constructor: RoomScreen(roomName, hostName, currentUserName, isHost)
                             RoomScreen guestRoomScreen(invite.roomName, invite.fromUsername, currentUser.username, false);
                             guestRoomScreen.setGuestPlayer(currentUser.username);
                             
-                            // Set timeout for non-blocking input
-                            wtimeout(guestRoomScreen.getMainWindow(), 50);
+                            // std::cerr << "[DEBUG] Setting up guest room window..." << std::endl;
+                            // CRITICAL: Explicitly set input mode on the room window
+                            WINDOW* roomWin = guestRoomScreen.getMainWindow();
+                            keypad(roomWin, TRUE);
+                            wtimeout(roomWin, 50);
+                            nodelay(roomWin, TRUE);  // Non-blocking mode
                             
-                            // Draw initial screen
-                            guestRoomScreen.draw();
+                            // Make sure this window gets input focus
+                            touchwin(roomWin);
+                            wrefresh(roomWin);
                             
-                            bool inGuestRoom = true;
-                            while (inGuestRoom) {
-                                // Check for game start notification
-                                // Note: Event loop is stopped, so no need to lock mutex
-                                // (No concurrent access possible)
-                                
-                                // Draw current state
+                            // Draw initial screen ONCE
+                            // std::cerr << "[DEBUG] Drawing initial guest room screen..." << std::endl;
+                            try {
                                 guestRoomScreen.draw();
+                                // std::cerr << "[DEBUG] draw() completed successfully" << std::endl;
+                                wrefresh(guestRoomScreen.getMainWindow()); // Force refresh
+                                // std::cerr << "[DEBUG] wrefresh() completed successfully" << std::endl;
+                            } catch (const std::exception& e) {
+                                std::cerr << "[ERROR] Exception during draw/wrefresh: " << e.what() << std::endl;
+                                break;
+                            }
+                            
+                            // std::cerr << "[DEBUG] Entering guest room loop..." << std::endl;
+                            bool inGuestRoom = true;
+                            int loopCount = 0;
+                            while (inGuestRoom) {
+                                loopCount++;
+                                // Check for game start notification
+                                {
+                                    std::unique_lock<std::mutex> lock(g_notificationMutex, std::try_to_lock);
+                                    if (!lock.owns_lock()) {
+                                        // Continue without checking, will check next iteration
+                                    } else {
+                                        if (!g_gameStartNotifications.empty()) {
+                                            auto gameStartInfo = g_gameStartNotifications.front();
+                                            g_gameStartNotifications.pop();
+                                            g_gameStartNotifications.pop();
+                                        
+                                            // Game started! Transition to play screen
+                                            showMessage("Game Started!", "Host has started the game!", 2);
+                                            napms(1500);
+                                            
+                                            // Store game session info
+                                            g_gameSession.roomName = invite.roomName;
+                                            g_gameSession.hostUsername = invite.fromUsername;
+                                            g_gameSession.guestUsername = currentUser.username;
+                                            g_gameSession.wordLength = gameStartInfo.wordLength;
+                                            g_gameSession.isHost = false;
+                                            
+                                            // Restart event loop before going to play screen
+                                            client.startEventLoop();
+                                            
+                                            inGuestRoom = false;
+                                            currentScreen = AppScreen::PLAY;
+                                            break; // Exit loop immediately
+                                        }
+                                    }
+                                }
+                                // std::cerr << "[DEBUG] No game start notification" << std::endl;
+                                
+                                // Draw current state before waiting for input
+                                // std::cerr << "[DEBUG] About to call draw()..." << std::endl;
+                                guestRoomScreen.draw();
+                                // std::cerr << "[DEBUG] draw() completed" << std::endl;
+                                // std::cerr << "[DEBUG] draw() completed" << std::endl;
+                                
+                                // Ensure window is properly refreshed
+                                // std::cerr << "[DEBUG] Refreshing window..." << std::endl;
+                                touchwin(guestRoomScreen.getMainWindow());
+                                wrefresh(guestRoomScreen.getMainWindow());
+                                // std::cerr << "[DEBUG] Window refreshed" << std::endl;
+                                
+                                if (loopCount == 1) {
+                                    // std::cerr << "[DEBUG] First iteration - checking window state..." << std::endl;
+                                    // std::cerr << "[DEBUG] mainWin pointer: " << guestRoomScreen.getMainWindow() << std::endl;
+                                }
                                 
                                 // Wait for input (with a 50ms timeout)
+                                // std::cerr << "[DEBUG] Calling handleInput()..." << std::endl;
                                 int roomResult = guestRoomScreen.handleInput();
+                                // std::cerr << "[DEBUG] handleInput() returned: " << roomResult << std::endl;
+                                
+                                if (roomResult != 0 && loopCount % 10 == 0) {
+                                    // std::cerr << "[DEBUG] Guest room handleInput returned: " << roomResult << std::endl;
+                                }
 
                                 // If a resize happened, re-apply timeout and continue
                                 if (roomResult == 3) {
@@ -308,19 +421,36 @@ int main() {
                                     continue;
                                 }
                                 
+                                // If no input (timeout), just continue without extra draw
+                                if (roomResult == 0) {
+                                    continue;
+                                }
+                                
                                 switch(roomResult) {
                                     case 1:  // READY (guest only)
                                         {
+                                            // std::cerr << "[DEBUG] Guest pressed READY button" << std::endl;
                                             // Send ready status to server
                                             auto readyResponse = client.setReady(invite.roomId, true);
+                                            // std::cerr << "[DEBUG] setReady returned, code: " << static_cast<int>(readyResponse.code) << std::endl;
                                             
                                             if (readyResponse.code == ResultCode::SUCCESS) {
+                                                guestRoomScreen.setGuestReady(true);
                                                 showMessage("Ready Status", "You are ready! Waiting for host to start...", 2);
                                                 napms(1000);
-                                                guestRoomScreen.setGuestReady(true);
+                                                
+                                                // Re-establish window state after message
+                                                clear();
+                                                refresh();
+                                                wtimeout(guestRoomScreen.getMainWindow(), 50);
                                             } else {
                                                 showMessage("Error", "Failed to set ready: " + readyResponse.message, 6);
                                                 napms(1500);
+                                                
+                                                // Re-establish window state after message
+                                                clear();
+                                                refresh();
+                                                wtimeout(guestRoomScreen.getMainWindow(), 50);
                                             }
                                             // Force redraw after message
                                             guestRoomScreen.draw();
@@ -343,6 +473,12 @@ int main() {
                                                 usersDialog.setUserList(onlineList.users);
                                                 usersDialog.show();
                                             }
+                                            
+                                            // Re-establish window state after dialog/message
+                                            clear();
+                                            refresh();
+                                            wtimeout(guestRoomScreen.getMainWindow(), 50);
+                                            
                                             // Force redraw after dialog
                                             guestRoomScreen.draw();
                                         }
@@ -350,10 +486,18 @@ int main() {
                                         
                                     case -1:  // Exit Room
                                         {
+                                            // std::cerr << "[DEBUG] Guest exiting room..." << std::endl;
                                             auto leaveResponse = client.leaveRoom(invite.roomId);
+                                            // std::cerr << "[DEBUG] leaveRoom returned, code: " << static_cast<int>(leaveResponse.code) << std::endl;
                                             if (leaveResponse.code != ResultCode::SUCCESS) {
                                                 showMessage("Error", "Failed to leave room properly", 6);
                                                 napms(1000);
+                                                
+                                                // Re-establish window state
+                                                clear();
+                                                refresh();
+                                                wtimeout(guestRoomScreen.getMainWindow(), 50);
+                                                
                                                 guestRoomScreen.draw();
                                             }
                                             inGuestRoom = false;
@@ -361,6 +505,11 @@ int main() {
                                         break;
                                 }
                             }
+                            
+                            // Restart event loop before going back to main menu
+                            // std::cerr << "[DEBUG] Guest exited room loop, restarting event loop..." << std::endl;
+                            client.startEventLoop();
+                            // std::cerr << "[DEBUG] Event loop restarted, going back to main menu" << std::endl;
                             
                             // After leaving room, back to main menu
                             currentScreen = AppScreen::MAIN_MENU;
@@ -443,6 +592,13 @@ int main() {
                 // Initialize room screen with room ID from server
                 uint32_t roomId = createResponse.room_id;
                 RoomScreen roomScreen(roomName, currentUser.username, currentUser.username, true);
+                std::string guestUsername = ""; // Track guest who joins
+                
+                // Set timeout for non-blocking input to check notifications
+                wtimeout(roomScreen.getMainWindow(), 50);
+                
+                // Draw initial screen
+                roomScreen.draw();
                 
                 bool inRoom = true;
                 while (inRoom) {
@@ -457,10 +613,17 @@ int main() {
                             
                             if (response.accepted) {
                                 // Guest accepted - add them to room
+                                guestUsername = response.toUsername; // Save guest name
                                 roomScreen.setGuestPlayer(response.toUsername);
                                 showMessage("Player Joined", 
                                           response.toUsername + " has joined your room!", 2);
                                 napms(1500);
+                                
+                                // Re-establish window state after message
+                                clear();
+                                refresh();
+                                wtimeout(roomScreen.getMainWindow(), 50);
+                                
                                 // Force redraw after message closes
                                 roomScreen.draw();
                             } else {
@@ -468,6 +631,12 @@ int main() {
                                 showMessage("Invitation Declined", 
                                           response.toUsername + " declined your invitation.", 6);
                                 napms(2000);
+                                
+                                // Re-establish window state after message
+                                clear();
+                                refresh();
+                                wtimeout(roomScreen.getMainWindow(), 50);
+                                
                                 // Force redraw after message closes
                                 roomScreen.draw();
                             }
@@ -488,8 +657,14 @@ int main() {
                     // Draw current state
                     roomScreen.draw();
                     
-                    // Handle input
+                    // Handle input (with 50ms timeout)
                     int result = roomScreen.handleInput();
+                    
+                    // If a resize happened, re-apply timeout and continue
+                    if (result == 3) {
+                        wtimeout(roomScreen.getMainWindow(), 50);
+                        continue;
+                    }
                     
                     switch(result) {
                         case 1:  // START GAME (host only)
@@ -499,15 +674,55 @@ int main() {
                                 auto startResponse = client.startGame(roomId);
                                 
                                 if (startResponse.code == ResultCode::SUCCESS) {
-                                    // TODO: Enter game screen
-                                    showMessage("Game Started!", "Starting match...", 2);
-                                    napms(2000);
-                                    // For now, exit room
-                                    inRoom = false;
-                                    currentScreen = AppScreen::MAIN_MENU;
+                                    // Wait a moment for server to send S2C_GameStart notification
+                                    napms(500);
+                                    
+                                    // Check for game start notification
+                                    bool gameStartReceived = false;
+                                    GameStartNotification gameStartInfo;
+                                    {
+                                        std::lock_guard<std::mutex> lock(g_notificationMutex);
+                                        if (!g_gameStartNotifications.empty()) {
+                                            gameStartInfo = g_gameStartNotifications.front();
+                                            g_gameStartNotifications.pop();
+                                            gameStartReceived = true;
+                                        }
+                                    }
+                                    
+                                    if (gameStartReceived) {
+                                        // Enter game screen
+                                        showMessage("Game Started!", "Starting match...", 2);
+                                        napms(1000);
+                                        
+                                        // Store game session info
+                                        g_gameSession.roomName = roomName;
+                                        g_gameSession.hostUsername = currentUser.username;
+                                        g_gameSession.guestUsername = guestUsername;
+                                        g_gameSession.wordLength = gameStartInfo.wordLength;
+                                        g_gameSession.isHost = true;
+                                        
+                                        // Exit room loop and transition to play screen
+                                        inRoom = false;
+                                        currentScreen = AppScreen::PLAY;
+                                    } else {
+                                        showMessage("Error", "Failed to receive game start notification", 6);
+                                        napms(2000);
+                                        
+                                        // Re-establish window state
+                                        clear();
+                                        refresh();
+                                        wtimeout(roomScreen.getMainWindow(), 50);
+                                        
+                                        roomScreen.draw();
+                                    }
                                 } else {
                                     showMessage("Error", "Failed to start game: " + startResponse.message, 6);
                                     napms(2000);
+                                    
+                                    // Re-establish window state
+                                    clear();
+                                    refresh();
+                                    wtimeout(roomScreen.getMainWindow(), 50);
                                 }
                                 roomScreen.draw();
                             }
@@ -523,6 +738,12 @@ int main() {
                                 if (onlineList.users.empty()) {
                                     showMessage("No Users", "No free users available at the moment", 5);
                                     napms(2000);
+                                    
+                                    // Re-establish window state
+                                    clear();
+                                    refresh();
+                                    wtimeout(roomScreen.getMainWindow(), 50);
+                                    
                                     // Force redraw after message
                                     roomScreen.draw();
                                 } else {
@@ -542,10 +763,19 @@ int main() {
                                         showMessage("Invite Sent", 
                                                    "Invitation sent to " + selectedUser + ". Waiting for response...", 2);
                                         napms(2000);
+                                        
+                                        // Re-establish window state
+                                        clear();
+                                        refresh();
+                                        wtimeout(roomScreen.getMainWindow(), 50);
+                                        
                                         // Force redraw after message
                                         roomScreen.draw();
                                     } else {
-                                        // User cancelled - redraw room screen
+                                        // User cancelled - restore and redraw room screen
+                                        clear();
+                                        refresh();
+                                        wtimeout(roomScreen.getMainWindow(), 50);
                                         roomScreen.draw();
                                     }
                                 }
@@ -578,6 +808,32 @@ int main() {
             case AppScreen::RANKINGS: {
                 showComingSoon("Rankings");
                 currentScreen = AppScreen::MAIN_MENU;
+                break;
+            }
+            
+            case AppScreen::PLAY: {
+                // Enter play screen with game session data
+                PlayScreen playScreen(
+                    g_gameSession.roomName,
+                    g_gameSession.hostUsername,
+                    g_gameSession.guestUsername,
+                    currentUser.username,
+                    g_gameSession.isHost
+                );
+                
+                bool inGame = true;
+                while (inGame) {
+                    playScreen.draw();
+                    int result = playScreen.handleInput();
+                    
+                    if (result == -1) {
+                        // Exit game
+                        showMessage("Game Ended", "Returning to main menu...", 2);
+                        napms(1500);
+                        inGame = false;
+                        currentScreen = AppScreen::MAIN_MENU;
+                    }
+                }
                 break;
             }
             

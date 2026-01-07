@@ -193,11 +193,12 @@ S2C_CreateRoomResult GameClient::respondInvite(const std::string& fromUsername, 
     auto result = sendAndReceive<S2C_CreateRoomResult>(request.to_bytes());
     std::cerr << "DEBUG: Received response, code=" << static_cast<int>(result.code) << std::endl;
     
-    // Restart event loop if it was running
-    if (wasRunning) {
-        std::cerr << "DEBUG: Restarting event loop..." << std::endl;
-        startEventLoop();
-    }
+    // DO NOT restart event loop here - let caller manage it
+    // Guest room needs event loop STOPPED for clean input handling
+    // if (wasRunning) {
+    //     std::cerr << "DEBUG: Restarting event loop..." << std::endl;
+    //     startEventLoop();
+    // }
     
     return result;
 }

@@ -15,6 +15,7 @@ MainMenuScreen::MainMenuScreen()
     // Tạo main window
     mainWin = newwin(height, width, 0, 0);
     keypad(mainWin, TRUE);
+    wtimeout(mainWin, 100);  // 100ms timeout to check for notifications
     
     // Tạo info window (user stats)
     int infoY = 2;

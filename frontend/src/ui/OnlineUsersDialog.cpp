@@ -54,9 +54,9 @@ void OnlineUsersDialog::drawUserList() {
     mvwprintw(dialogWin, startY, 56, "Status");
     wattroff(dialogWin, COLOR_PAIR(5) | A_BOLD);
     
-    // Draw separator
+    // Draw separator with ACS line
     wattron(dialogWin, COLOR_PAIR(3));
-    mvwprintw(dialogWin, startY + 1, 4, "────────────────────────────────────────────────────────────");
+    mvwhline(dialogWin, startY + 1, 4, ACS_HLINE, 60);
     wattroff(dialogWin, COLOR_PAIR(3));
     
     startY += 2;
@@ -144,15 +144,8 @@ void OnlineUsersDialog::drawError() {
 }
 
 void OnlineUsersDialog::draw() {
-    // Dim background
+    // Clear background
     werase(mainWin);
-    wattron(mainWin, COLOR_PAIR(3) | A_DIM);
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-            mvwaddch(mainWin, y, x, ' ');
-        }
-    }
-    wattroff(mainWin, COLOR_PAIR(3) | A_DIM);
     wrefresh(mainWin);
     
     // Draw dialog

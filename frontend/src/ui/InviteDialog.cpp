@@ -99,9 +99,8 @@ void InviteDialog::drawInstructions() {
 }
 
 void InviteDialog::draw() {
-    // Dim background - fill with space characters
+    // Clear background
     werase(mainWin);
-    wbkgd(mainWin, ' ' | COLOR_PAIR(3) | A_DIM);
     wrefresh(mainWin);
     
     // Draw dialog

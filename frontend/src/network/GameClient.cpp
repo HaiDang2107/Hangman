@@ -412,7 +412,7 @@ void GameClient::handleNotification(const PacketHeader& header) {
             break;
             
         default:
-            std::cerr << "Unknown notification type: " << static_cast<int>(header.type) << std::endl;
+            // Ignore unknown packet types
             break;
     }
 }

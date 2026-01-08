@@ -256,9 +256,9 @@ StartGameResult BeforePlayService::startGame(const C2S_StartGame& request, int h
 
     // Initialize Match (MatchService will generate words for both rounds)
     std::vector<std::string> players;
-    for (const auto& p : room->players) {
-        players.push_back(p.username);
-    }
+    // Ensure host is first so they get the first turn
+    players.push_back(username);  // Host first
+    players.push_back(opponentName);  // Opponent second
     MatchService::getInstance().startMatch(request.room_id, players, "");  // Empty string, not used
 
     // Get initial word length from match

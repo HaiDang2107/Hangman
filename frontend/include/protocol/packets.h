@@ -226,7 +226,8 @@ struct S2C_GuessCharResult {
     uint8_t remaining_attempts;
     uint32_t score_gained;  // Score earned from this guess
     uint32_t total_score;   // Player's total score
-    uint8_t current_round;  // 1 or 2
+    uint8_t current_round;  // 1, 2, or 3
+    bool is_my_turn;  // Is it still this player's turn?
     std::vector<uint8_t> to_bytes() const;
     static S2C_GuessCharResult from_payload(ByteBuffer& bb);
 };
@@ -246,9 +247,10 @@ struct S2C_GuessWordResult {
     uint8_t remaining_attempts;
     uint32_t score_gained;  // Score earned/lost from this guess
     uint32_t total_score;   // Player's total score
-    uint8_t current_round;  // 1 or 2
+    uint8_t current_round;  // 1, 2, or 3
     bool round_complete;    // If this guess completed the round
     std::string next_word_pattern;  // Pattern for next round (if round_complete)
+    bool is_my_turn;  // Is it still this player's turn?
     std::vector<uint8_t> to_bytes() const;
     static S2C_GuessWordResult from_payload(ByteBuffer& bb);
 };

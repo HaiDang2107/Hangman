@@ -49,6 +49,7 @@ struct GuessCharResultNotification {
     uint32_t totalScore;
     uint8_t currentRound;
     bool isOpponentGuess;  // true if this is opponent's guess result
+    bool isMyTurn;  // Whether it's my turn after this guess
 };
 
 struct GuessWordResultNotification {
@@ -61,6 +62,7 @@ struct GuessWordResultNotification {
     bool roundComplete;
     std::string nextWordPattern;
     bool isOpponentGuess;
+    bool isMyTurn;  // Whether it's my turn after this guess
 };
 
 struct DrawRequestNotification {
@@ -243,7 +245,8 @@ int main() {
             result.score_gained,
             result.total_score,
             result.current_round,
-            true  // This is opponent's guess
+            true,  // This is opponent's guess
+            result.is_my_turn  // Whether it's my turn now
         });
     });
     
@@ -258,7 +261,8 @@ int main() {
             result.current_round,
             result.round_complete,
             result.next_word_pattern,
-            true  // This is opponent's guess
+            true,  // This is opponent's guess
+            result.is_my_turn  // Whether it's my turn now
         });
     });
     
@@ -978,7 +982,7 @@ int main() {
                                         playScreen.setGameMessage("Round " + std::to_string((int)result.currentRound) + " started! Waiting for opponent...");
                                         
                                         // Opponent caused transition, so it's still their turn (they go first in new round)
-                                        playScreen.setMyTurn(false);
+                                        playScreen.setMyTurn(result.isMyTurn);
                                     } else {
                                         playScreen.setRound(result.currentRound);
                                         if (result.correct) {
@@ -987,8 +991,8 @@ int main() {
                                             playScreen.setGameMessage("Opponent guessed wrong!");
                                         }
                                         
-                                        // Normal turn - now it's our turn
-                                        playScreen.setMyTurn(true);
+                                        // Use server's turn information
+                                        playScreen.setMyTurn(result.isMyTurn);
                                     }
                                     
                                     // Redraw immediately to show changes
@@ -1018,8 +1022,8 @@ int main() {
                                         playScreen.handleRoundTransition(result.nextWordPattern);
                                         playScreen.setGameMessage("Round " + std::to_string((int)result.currentRound) + " started! Waiting for opponent...");
                                         
-                                        // Opponent caused transition, so it's still their turn
-                                        playScreen.setMyTurn(false);
+                                        // Use server's turn information
+                                        playScreen.setMyTurn(result.isMyTurn);
                                     } else {
                                         playScreen.setRound(result.currentRound);
                                         
@@ -1029,7 +1033,8 @@ int main() {
                                         } else {
                                             playScreen.setRemainingAttempts(result.remainingAttempts);
                                             playScreen.setGameMessage(result.message);
-                                            playScreen.setMyTurn(true);
+                                            // Use server's turn information
+                                            playScreen.setMyTurn(result.isMyTurn);
                                         }
                                     }
                                     

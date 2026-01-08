@@ -131,6 +131,11 @@ void MatchService::startMatch(uint32_t roomId, const std::vector<std::string>& p
     match.round3Word = getRandomWord(3);
     match.currentWord = match.round1Word;
     match.active = true;
+    
+    // Initialize turn - first player in list starts
+    if (!players.empty()) {
+        match.currentTurnUsername = players[0];
+    }
 
     for (const auto& p : players) {
         PlayerMatchState state;
@@ -144,7 +149,8 @@ void MatchService::startMatch(uint32_t roomId, const std::vector<std::string>& p
     std::cout << "Match started for room " << roomId 
               << " - Round 1: " << match.round1Word 
               << ", Round 2: " << match.round2Word
-              << ", Round 3: " << match.round3Word << std::endl;
+              << ", Round 3: " << match.round3Word 
+              << " - " << match.currentTurnUsername << " starts first" << std::endl;
 }
 
 MatchInfo MatchService::getMatchInfo(uint32_t roomId) {
@@ -248,6 +254,12 @@ GuessCharResult MatchService::guessChar(const C2S_GuessChar& request) {
         result.errorPacket.message = "Player not in match";
         return result;
     }
+    
+    // Check if it's this player's turn
+    if (match.currentTurnUsername != username) {
+        result.errorPacket.message = "Not your turn";
+        return result;
+    }
 
     PlayerMatchState& state = match.playerStates[username];
     if (state.finished) {
@@ -275,16 +287,25 @@ GuessCharResult MatchService::guessChar(const C2S_GuessChar& request) {
         if (state.remainingAttempts > 0) state.remainingAttempts--;
     }
     state.guessedChars.insert(request.ch);
+    
+    // Switch turn to opponent (unless game/round ends)
+    std::string opponentUsername;
+    for (const auto& pair : match.playerStates) {
+        if (pair.first != username) {
+            opponentUsername = pair.first;
+            break;
+        }
+    }
+    
+    // Default: switch turn
+    bool switchTurn = true;
 
     result.success = true;
     result.guesserUsername = username;
 
-    // Find opponent
-    for (const auto& pair : match.playerStates) {
-        if (pair.first != username) {
-            result.opponentFd = AuthService::getInstance().getClientFd(pair.first);
-            break;
-        }
+    // Find opponent fd
+    if (!opponentUsername.empty()) {
+        result.opponentFd = AuthService::getInstance().getClientFd(opponentUsername);
     }
 
     // Check win/loss condition for current round BEFORE creating response packet
@@ -298,6 +319,7 @@ GuessCharResult MatchService::guessChar(const C2S_GuessChar& request) {
 
     if (won) {
         // Player completed current round
+        switchTurn = false;  // Don't switch on round completion - player continues
         if (match.currentRound == 1) {
             // Move to round 2 - both players transition together
             match.currentRound = 2;
@@ -337,6 +359,7 @@ GuessCharResult MatchService::guessChar(const C2S_GuessChar& request) {
         }
     } else if (state.remainingAttempts == 0) {
         // Out of attempts in current round
+        switchTurn = false;  // Don't switch on round completion
         if (match.currentRound == 1) {
             // Move to round 2 - both players transition together
             match.currentRound = 2;
@@ -374,6 +397,11 @@ GuessCharResult MatchService::guessChar(const C2S_GuessChar& request) {
             sendGameSummary(request.room_id);
         }
     }
+    
+    // Switch turn if needed
+    if (switchTurn && !opponentUsername.empty()) {
+        match.currentTurnUsername = opponentUsername;
+    }
 
     // Get fresh state reference after potential reset
     auto& freshState = match.playerStates[username];
@@ -386,17 +414,19 @@ GuessCharResult MatchService::guessChar(const C2S_GuessChar& request) {
     result.resultPacket.score_gained = result.scoreGained;
     result.resultPacket.total_score = freshState.score;
     result.resultPacket.current_round = match.currentRound;
+    result.resultPacket.is_your_turn = (match.currentTurnUsername == username);
+    
+    // DEBUG
+    std::ofstream debug("/tmp/hangman_backend_debug.txt", std::ios::app);
+    if (debug.is_open()) {
+        debug << "[MatchService::guessChar] username=" << username 
+              << " currentTurnUsername=" << match.currentTurnUsername
+              << " is_your_turn=" << result.resultPacket.is_your_turn << "\n";
+        debug.close();
+    }
 
     // Create opponent's pattern AFTER round transition
     // SAME pattern for opponent (using shared revealedChars)
-    std::string opponentUsername;
-    for (const auto& pair : match.playerStates) {
-        if (pair.first != username) {
-            opponentUsername = pair.first;
-            break;
-        }
-    }
-    
     if (!opponentUsername.empty()) {
         auto& opponentState = match.playerStates[opponentUsername];
         result.opponentPattern = getExposedPattern(match.currentWord, match.revealedChars);
@@ -427,12 +457,31 @@ GuessWordResult MatchService::guessWord(const C2S_GuessWord& request) {
     }
 
     Match& match = it->second;
+    
+    // Check if it's this player's turn
+    if (match.currentTurnUsername != username) {
+        result.errorPacket.message = "Not your turn";
+        return result;
+    }
+    
     PlayerMatchState& state = match.playerStates[username];
     
     if (state.finished) {
         result.errorPacket.message = "Already finished";
         return result;
     }
+    
+    // Find opponent username first
+    std::string opponentUsername;
+    for (const auto& pair : match.playerStates) {
+        if (pair.first != username) {
+            opponentUsername = pair.first;
+            break;
+        }
+    }
+    
+    // Default: switch turn
+    bool switchTurn = true;
 
     // Convert guess to uppercase for comparison
     std::string guessUpper = request.word;
@@ -490,6 +539,7 @@ GuessWordResult MatchService::guessWord(const C2S_GuessWord& request) {
     
     if (correct) {
         // Player guessed the word correctly
+        switchTurn = false;  // Player continues after correct guess
         if (match.currentRound == 1) {
             // Move to round 2 - both players transition together
             result.resultPacket.message = "Correct! Moving to Round 2!";
@@ -557,6 +607,7 @@ GuessWordResult MatchService::guessWord(const C2S_GuessWord& request) {
         result.resultPacket.message = "Incorrect! Lost " + std::to_string(penalty) + " points";
         
         if (state.remainingAttempts == 0) {
+            switchTurn = false;  // Don't switch on round transition
             if (match.currentRound == 1) {
                 // Out of attempts in round 1, move to round 2 - both players transition
                 result.resultPacket.message += ". Out of attempts! Moving to Round 2.";
@@ -609,6 +660,14 @@ GuessWordResult MatchService::guessWord(const C2S_GuessWord& request) {
             }
         }
     }
+    
+    // Switch turn if needed
+    if (switchTurn && !opponentUsername.empty()) {
+        match.currentTurnUsername = opponentUsername;
+    }
+    
+    // Set is_your_turn field
+    result.resultPacket.is_your_turn = (match.currentTurnUsername == username);
 
     return result;
 }

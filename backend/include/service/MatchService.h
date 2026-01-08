@@ -31,6 +31,7 @@ struct Match {
     uint8_t currentRound = 1; // 1, 2, or 3
     std::set<char> revealedChars;  // All correctly guessed chars (shared between players)
     std::unordered_map<std::string, PlayerMatchState> playerStates;
+    std::string currentTurnUsername;  // Username of player whose turn it is
     bool active = true;
 };
 

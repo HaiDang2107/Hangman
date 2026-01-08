@@ -645,6 +645,7 @@ namespace hangman
         bb.write_u32(score_gained);
         bb.write_u32(total_score);
         bb.write_u8(current_round);
+        bb.write_u8(is_my_turn ? 1 : 0);
 
         std::vector<uint8_t> header_bytes =
             PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::S2C_GuessCharResult, bb.size());
@@ -661,6 +662,7 @@ namespace hangman
         packet.score_gained = bb.read_u32();
         packet.total_score = bb.read_u32();
         packet.current_round = bb.read_u8();
+        packet.is_my_turn = (bb.read_u8() != 0);
         return packet;
     }
 
@@ -697,6 +699,7 @@ namespace hangman
         bb.write_u8(current_round);
         bb.write_u8(round_complete ? 1 : 0);
         bb.write_string(next_word_pattern);
+        bb.write_u8(is_my_turn ? 1 : 0);
 
         std::vector<uint8_t> header_bytes =
             PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::S2C_GuessWordResult, bb.size());
@@ -715,6 +718,7 @@ namespace hangman
         packet.current_round = bb.read_u8();
         packet.round_complete = (bb.read_u8() != 0);
         packet.next_word_pattern = bb.read_string();
+        packet.is_my_turn = (bb.read_u8() != 0);
         return packet;
     }
 
@@ -882,7 +886,23 @@ namespace hangman
         return ack;
     }
 
-    std::vector<uint8_t> S2C_Error::to_bytes() const { throw std::runtime_error("Not implemented"); }
-    S2C_Error S2C_Error::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }
+    std::vector<uint8_t> S2C_Error::to_bytes() const {
+        ByteBuffer bb;
+        bb.write_u16(for_type);
+        bb.write_string(message);
+
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::S2C_Error, bb.size());
+
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+    
+    S2C_Error S2C_Error::from_payload(ByteBuffer& bb) {
+        S2C_Error packet;
+        packet.for_type = bb.read_u16();
+        packet.message = bb.read_string();
+        return packet;
+    }
 
 } // namespace hangman

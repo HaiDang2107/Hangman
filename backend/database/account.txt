@@ -5,3 +5,4 @@ testuser2:testpass:0:0
 haidang:123456:0:0
 huanchuoi123:huanchuoi123:0:0
 huan123:huan123:0:0
+haidang:123456:2:20

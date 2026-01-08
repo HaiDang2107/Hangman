@@ -15,12 +15,7 @@ MainMenuScreen::MainMenuScreen()
     // Tạo main window
     mainWin = newwin(height, width, 0, 0);
     keypad(mainWin, TRUE);
-    wtimeout(mainWin, 100);  // 100ms timeout to check for notifications
-    
-    // Tạo info window (user stats)
-    int infoY = 2;
-    int infoX = width - INFO_BOX_WIDTH - 2;
-    infoWin = newwin(INFO_BOX_HEIGHT, INFO_BOX_WIDTH, infoY, infoX);
+    wtimeout(mainWin, 100);  // 100ms timeout to check notifications
     
     // Khởi tạo colors
     init_pair(1, COLOR_CYAN, COLOR_BLACK);      // Title
@@ -35,13 +30,10 @@ MainMenuScreen::~MainMenuScreen() {
     if (mainWin) {
         delwin(mainWin);
     }
-    if (infoWin) {
-        delwin(infoWin);
-    }
 }
 
 void MainMenuScreen::drawBorder() {
-    box(mainWin, 0, 0);
+    // No border
 }
 
 void MainMenuScreen::drawTitle() {
@@ -60,56 +52,7 @@ void MainMenuScreen::drawTitle() {
 }
 
 void MainMenuScreen::drawUserInfo() {
-    // Draw info window border
-    box(infoWin, 0, 0);
-    
-    // Title
-    wattron(infoWin, COLOR_PAIR(4) | A_BOLD);
-    mvwprintw(infoWin, 0, 2, "[ PLAYER INFO ]");
-    wattroff(infoWin, COLOR_PAIR(4) | A_BOLD);
-    
-    // Username
-    wattron(infoWin, COLOR_PAIR(3) | A_BOLD);
-    mvwprintw(infoWin, 2, 2, "Player:");
-    wattroff(infoWin, COLOR_PAIR(3) | A_BOLD);
-    
-    wattron(infoWin, COLOR_PAIR(2));
-    mvwprintw(infoWin, 2, 11, "%s", username.c_str());
-    wattroff(infoWin, COLOR_PAIR(2));
-    
-    // Level
-    wattron(infoWin, COLOR_PAIR(3));
-    mvwprintw(infoWin, 3, 2, "Level:");
-    wattroff(infoWin, COLOR_PAIR(3));
-    
-    wattron(infoWin, COLOR_PAIR(4));
-    mvwprintw(infoWin, 3, 11, "%d", userLevel);
-    wattroff(infoWin, COLOR_PAIR(4));
-    
-    // Divider
-    wattron(infoWin, COLOR_PAIR(3) | A_DIM);
-    mvwprintw(infoWin, 4, 2, "────────────────────────────────────");
-    wattroff(infoWin, COLOR_PAIR(3) | A_DIM);
-    
-    // Wins
-    wattron(infoWin, COLOR_PAIR(3));
-    mvwprintw(infoWin, 5, 2, "Wins:");
-    wattroff(infoWin, COLOR_PAIR(3));
-    
-    wattron(infoWin, COLOR_PAIR(2));
-    mvwprintw(infoWin, 5, 11, "%d", userWins);
-    wattroff(infoWin, COLOR_PAIR(2));
-    
-    // Losses
-    wattron(infoWin, COLOR_PAIR(3));
-    mvwprintw(infoWin, 6, 2, "Losses:");
-    wattroff(infoWin, COLOR_PAIR(3));
-    
-    wattron(infoWin, COLOR_PAIR(6));
-    mvwprintw(infoWin, 6, 11, "%d", userLosses);
-    wattroff(infoWin, COLOR_PAIR(6));
-    
-    wrefresh(infoWin);
+    // Player info removed
 }
 
 void MainMenuScreen::drawMenu() {
@@ -171,27 +114,7 @@ void MainMenuScreen::drawInstructions() {
 }
 
 void MainMenuScreen::drawDecoration() {
-    // Draw some decorative elements
-    wattron(mainWin, COLOR_PAIR(5) | A_DIM);
-    
-    // Left side decoration
-    for (int i = 10; i < 24; i += 2) {
-        mvwprintw(mainWin, i, 2, "│");
-    }
-    
-    // Right side decoration (avoid info box area)
-    int rightX = width - 3;
-    for (int i = 10; i < 24; i += 2) {
-        if (i > INFO_BOX_HEIGHT + 3) {  // Below info box
-            mvwprintw(mainWin, i, rightX, "│");
-        }
-    }
-    
-    // Bottom decoration
-    mvwprintw(mainWin, 9, 2, "╔══════════════════════════════════╗");
-    mvwprintw(mainWin, 24, 2, "╚══════════════════════════════════╝");
-    
-    wattroff(mainWin, COLOR_PAIR(5) | A_DIM);
+    // No decorations
     
     // Welcome message
     wattron(mainWin, COLOR_PAIR(4));
@@ -207,7 +130,6 @@ void MainMenuScreen::draw() {
     drawDecoration();
     drawMenu();
     drawInstructions();
-    drawUserInfo();
     wrefresh(mainWin);
 }
 

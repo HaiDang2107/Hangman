@@ -118,7 +118,7 @@ void PlayScreen::drawGameInfo(int y, int x) {
     
     // Round and Score
     attron(COLOR_PAIR(2) | A_BOLD);
-    mvprintw(y + 1, x, "Round: %d/2  |  Score: %u", currentRound, currentScore);
+    mvprintw(y + 1, x, "Round: %d/3  |  Score: %u", currentRound, currentScore);
     attroff(COLOR_PAIR(2) | A_BOLD);
     
     // Players
@@ -411,20 +411,28 @@ int PlayScreen::handleInput() {
                             handleRoundTransition(response.exposed_pattern);
                             gameMessage = "Round " + std::to_string((int)response.current_round) + " started!";
                             inputMode = InputMode::NORMAL;
-                            isMyTurn = true;  // Continue playing
+                            isMyTurn = response.is_my_turn;  // Use server's turn info
                         } else {
                             // No round change - update round normally
                             setRound(response.current_round);
                             
-                            if (wordCompleteInOldRound && response.current_round == 2) {
-                                // Completed round 2 - game over
-                                setGameOver(true, "You won both rounds! Final score: " + std::to_string(response.total_score));
-                            } else if (response.remaining_attempts == 0 && response.current_round == 2) {
-                                // Out of attempts in round 2
+                            if (wordCompleteInOldRound && response.current_round == 3) {
+                                // Completed round 3 - game over
+                                setGameOver(true, "You won all 3 rounds! Final score: " + std::to_string(response.total_score));
+                            } else if (response.remaining_attempts == 0 && response.current_round == 3) {
+                                // Out of attempts in round 3
                                 setGameOver(false, "Out of attempts! Final score: " + std::to_string(response.total_score));
                             } else {
                                 inputMode = InputMode::NORMAL;
-                                isMyTurn = false;  // Turn switches to opponent
+                                isMyTurn = response.is_my_turn;  // Use server's turn info
+                                
+                                // DEBUG
+                                FILE* f = fopen("/tmp/hangman_debug.txt", "a");
+                                if (f) {
+                                    fprintf(f, "[PlayScreen] After guess char: is_my_turn=%d, isMyTurn=%d\n", 
+                                            response.is_my_turn ? 1 : 0, isMyTurn ? 1 : 0);
+                                    fclose(f);
+                                }
                             }
                         }
                     } catch (const std::exception& e) {
@@ -465,31 +473,31 @@ int PlayScreen::handleInput() {
                             setRound(response.current_round);
                             handleRoundTransition(response.next_word_pattern);
                             gameMessage = "Round " + std::to_string((int)response.current_round) + " started!";
-                            isMyTurn = true;  // Continue playing in next round
+                            isMyTurn = response.is_my_turn;  // Use server's turn info
                         } else {
                             setRound(response.current_round);
                             
-                            if (response.correct && response.current_round == 2) {
-                                // Correct guess in round 2 - game over
+                            if (response.correct && response.current_round == 3) {
+                                // Correct guess in round 3 - game over
                                 setGameOver(true, "You guessed the word: " + guess + "! Final score: " + std::to_string(response.total_score));
-                            } else if (response.correct && response.current_round == 1) {
+                            } else if (response.correct && (response.current_round == 1 || response.current_round == 2)) {
                                 // This shouldn't happen (server should set round_complete), but handle it
                                 handleRoundTransition(response.next_word_pattern);
-                                gameMessage = "Correct! Moving to Round 2!";
-                                isMyTurn = true;
+                                gameMessage = "Correct! Moving to next round!";
+                                isMyTurn = response.is_my_turn;  // Use server's turn info
                             } else {
                                 setRemainingAttempts(response.remaining_attempts);
                                 gameMessage = response.message;
                                 
-                                if (response.remaining_attempts == 0 && response.current_round == 2) {
+                                if (response.remaining_attempts == 0 && response.current_round == 3) {
                                     setGameOver(false, "Out of attempts! Final score: " + std::to_string(response.total_score));
-                                } else if (response.remaining_attempts == 0 && response.current_round == 1) {
+                                } else if (response.remaining_attempts == 0 && (response.current_round == 1 || response.current_round == 2)) {
                                     // This shouldn't happen (server should set round_complete), but handle it
                                     handleRoundTransition(response.next_word_pattern);
-                                    gameMessage = "Out of attempts! Moving to Round 2.";
-                                    isMyTurn = true;
+                                    gameMessage = "Out of attempts! Moving to next round.";
+                                    isMyTurn = response.is_my_turn;  // Use server's turn info
                                 } else {
-                                    isMyTurn = false;  // Turn switches to opponent
+                                    isMyTurn = response.is_my_turn;  // Use server's turn info
                                 }
                             }
                         }

@@ -13,7 +13,10 @@ struct PlayerMatchState {
     std::string username;
     std::set<char> guessedChars;
     uint8_t remainingAttempts = 6; // Standard hangman lives
-    uint32_t score = 0;  // Player's score
+    uint32_t score = 0;  // Player's total score
+    uint32_t round1Score = 0;  // Score earned in round 1
+    uint32_t round2Score = 0;  // Score earned in round 2
+    uint32_t round3Score = 0;  // Score earned in round 3
     bool finished = false;
     bool won = false;
 };
@@ -24,9 +27,11 @@ struct Match {
     std::string currentWord;  // Current round's word
     std::string round1Word;   // Round 1 word (saved for reference)
     std::string round2Word;   // Round 2 word (saved for reference)
-    uint8_t currentRound = 1; // 1 or 2
+    std::string round3Word;   // Round 3 word (saved for reference)
+    uint8_t currentRound = 1; // 1, 2, or 3
     std::set<char> revealedChars;  // All correctly guessed chars (shared between players)
     std::unordered_map<std::string, PlayerMatchState> playerStates;
+    std::string currentTurnUsername;  // Username of player whose turn it is
     bool active = true;
 };
 
@@ -87,6 +92,9 @@ public:
     // End Game (Resign or explicit end)
     EndGameResult endGame(const C2S_EndGame& request);
     
+    // Send game summary to both players
+    void sendGameSummary(uint32_t roomId);
+    
     // Get opponent's exposed pattern after a guess
     std::string getOpponentPattern(uint32_t roomId, const std::string& guesserUsername, 
                                    char guessedChar, bool wasCorrect);
@@ -103,6 +111,7 @@ private:
     
     std::vector<std::string> round1Words;  // Words for round 1 (4-7 letters)
     std::vector<std::string> round2Words;  // Words for round 2 (8-12 letters)
+    std::vector<std::string> round3Words;  // Words for round 3 (10-15 letters)
     
     void loadWords();  // Load words from files
     std::string getRandomWord(uint8_t round);  // Get random word for round

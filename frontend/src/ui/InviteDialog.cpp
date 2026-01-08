@@ -99,17 +99,8 @@ void InviteDialog::drawInstructions() {
 }
 
 void InviteDialog::draw() {
-    // Dim background with flashing effect
+    // Clear background
     werase(mainWin);
-    wattron(mainWin, COLOR_PAIR(5) | A_BOLD);
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-            if ((y + x) % 4 == 0) {
-                mvwaddch(mainWin, y, x, '.');
-            }
-        }
-    }
-    wattroff(mainWin, COLOR_PAIR(5) | A_BOLD);
     wrefresh(mainWin);
     
     // Draw dialog

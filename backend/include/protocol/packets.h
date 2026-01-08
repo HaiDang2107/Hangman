@@ -227,6 +227,7 @@ struct S2C_GuessCharResult {
     uint32_t score_gained;  // Score earned from this guess
     uint32_t total_score;   // Player's total score
     uint8_t current_round;  // 1 or 2
+    bool is_your_turn;      // Whether it's this player's turn now
     std::vector<uint8_t> to_bytes() const;
     static S2C_GuessCharResult from_payload(ByteBuffer& bb);
 };
@@ -249,6 +250,7 @@ struct S2C_GuessWordResult {
     uint8_t current_round;  // 1 or 2
     bool round_complete;    // If this guess completed the round
     std::string next_word_pattern;  // Pattern for next round (if round_complete)
+    bool is_your_turn;      // Whether it's this player's turn now
     std::vector<uint8_t> to_bytes() const;
     static S2C_GuessWordResult from_payload(ByteBuffer& bb);
 };
@@ -284,6 +286,24 @@ struct S2C_GameEnd {
     std::string summary;
     std::vector<uint8_t> to_bytes() const;
     static S2C_GameEnd from_payload(ByteBuffer& bb);
+};
+
+struct S2C_GameSummary {
+    std::string player1_username;
+    uint32_t player1_round1_score;
+    uint32_t player1_round2_score;
+    uint32_t player1_round3_score;
+    uint32_t player1_total_score;
+    
+    std::string player2_username;
+    uint32_t player2_round1_score;
+    uint32_t player2_round2_score;
+    uint32_t player2_round3_score;
+    uint32_t player2_total_score;
+    
+    std::string winner_username;  // Empty if draw
+    std::vector<uint8_t> to_bytes() const;
+    static S2C_GameSummary from_payload(ByteBuffer& bb);
 };
 
 // Records / leaderboard

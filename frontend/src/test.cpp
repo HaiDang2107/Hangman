@@ -8,6 +8,7 @@
 #include "ui/InviteDialog.h"
 #include "ui/PlayScreen.h"
 #include "ui/DrawRequestDialog.h"
+#include "ui/GameSummaryScreen.h"
 #include "network/GameClient.h"
 #include <string>
 #include <iostream>
@@ -48,6 +49,7 @@ struct GuessCharResultNotification {
     uint32_t totalScore;
     uint8_t currentRound;
     bool isOpponentGuess;  // true if this is opponent's guess result
+    bool isMyTurn;  // Whether it's my turn after this guess
 };
 
 struct GuessWordResultNotification {
@@ -60,6 +62,7 @@ struct GuessWordResultNotification {
     bool roundComplete;
     std::string nextWordPattern;
     bool isOpponentGuess;
+    bool isMyTurn;  // Whether it's my turn after this guess
 };
 
 struct DrawRequestNotification {
@@ -73,6 +76,10 @@ struct GameEndNotification {
     std::string summary;
 };
 
+struct GameSummaryNotification {
+    S2C_GameSummary data;
+};
+
 std::queue<PendingInvite> g_pendingInvites;
 std::queue<InviteResponseNotification> g_inviteResponses;
 std::queue<PlayerReadyNotification> g_playerReadyUpdates;
@@ -81,6 +88,7 @@ std::queue<GuessCharResultNotification> g_guessCharResults;
 std::queue<GuessWordResultNotification> g_guessWordResults;
 std::queue<DrawRequestNotification> g_drawRequests;
 std::queue<GameEndNotification> g_gameEndNotifications;
+std::queue<GameSummaryNotification> g_gameSummaries;
 std::mutex g_notificationMutex;
 
 enum class AppScreen {
@@ -237,7 +245,8 @@ int main() {
             result.score_gained,
             result.total_score,
             result.current_round,
-            true  // This is opponent's guess
+            true,  // This is opponent's guess
+            result.is_my_turn  // Whether it's my turn now
         });
     });
     
@@ -252,7 +261,8 @@ int main() {
             result.current_round,
             result.round_complete,
             result.next_word_pattern,
-            true  // This is opponent's guess
+            true,  // This is opponent's guess
+            result.is_my_turn  // Whether it's my turn now
         });
     });
     
@@ -271,6 +281,11 @@ int main() {
             gameEnd.result_code,
             gameEnd.summary
         });
+    });
+    
+    client.setGameSummaryHandler([](const S2C_GameSummary& summary) {
+        std::lock_guard<std::mutex> lock(g_notificationMutex);
+        g_gameSummaries.push({summary});
     });
     
     LoginScreen loginScreen;
@@ -607,8 +622,14 @@ int main() {
                         }
                 }
                 
+                // Draw menu (will be redrawn after input or on invite)
                 mainMenuScreen.draw();
                 int result = mainMenuScreen.handleInput();
+                
+                // If no input (timeout), continue loop to check notifications
+                if (result == 0) {
+                    continue;
+                }
                 
                 switch(result) {
                     case 1:  // Create Room
@@ -961,7 +982,7 @@ int main() {
                                         playScreen.setGameMessage("Round " + std::to_string((int)result.currentRound) + " started! Waiting for opponent...");
                                         
                                         // Opponent caused transition, so it's still their turn (they go first in new round)
-                                        playScreen.setMyTurn(false);
+                                        playScreen.setMyTurn(result.isMyTurn);
                                     } else {
                                         playScreen.setRound(result.currentRound);
                                         if (result.correct) {
@@ -970,8 +991,8 @@ int main() {
                                             playScreen.setGameMessage("Opponent guessed wrong!");
                                         }
                                         
-                                        // Normal turn - now it's our turn
-                                        playScreen.setMyTurn(true);
+                                        // Use server's turn information
+                                        playScreen.setMyTurn(result.isMyTurn);
                                     }
                                     
                                     // Redraw immediately to show changes
@@ -1001,18 +1022,19 @@ int main() {
                                         playScreen.handleRoundTransition(result.nextWordPattern);
                                         playScreen.setGameMessage("Round " + std::to_string((int)result.currentRound) + " started! Waiting for opponent...");
                                         
-                                        // Opponent caused transition, so it's still their turn
-                                        playScreen.setMyTurn(false);
+                                        // Use server's turn information
+                                        playScreen.setMyTurn(result.isMyTurn);
                                     } else {
                                         playScreen.setRound(result.currentRound);
                                         
-                                        if (result.correct && result.currentRound == 2) {
-                                            // Opponent won in round 2 - game over
+                                        if (result.correct && result.currentRound == 3) {
+                                            // Opponent won in round 3 - game over
                                             playScreen.setGameOver(false, "Opponent guessed the word! They scored " + std::to_string(result.totalScore));
                                         } else {
                                             playScreen.setRemainingAttempts(result.remainingAttempts);
                                             playScreen.setGameMessage(result.message);
-                                            playScreen.setMyTurn(true);
+                                            // Use server's turn information
+                                            playScreen.setMyTurn(result.isMyTurn);
                                         }
                                     }
                                     
@@ -1070,6 +1092,29 @@ int main() {
                                 
                                 // Redraw immediately to show changes
                                 playScreen.draw();
+                            }
+                            
+                            // Check game summary notifications
+                            if (!g_gameSummaries.empty()) {
+                                auto summary = g_gameSummaries.front();
+                                g_gameSummaries.pop();
+                                
+                                // Release lock before showing summary screen
+                                lock.unlock();
+                                
+                                // Show game summary
+                                GameSummaryScreen summaryScreen;
+                                summaryScreen.show(summary.data);
+                                summaryScreen.run();
+                                
+                                // Return to main menu after summary
+                                if (summaryScreen.shouldReturnToMenu()) {
+                                    inGame = false;
+                                    currentScreen = AppScreen::MAIN_MENU;
+                                }
+                                
+                                // Reacquire lock for next iteration
+                                lock.lock();
                             }
                         }
                     }

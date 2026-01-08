@@ -239,6 +239,7 @@ void GuessCharTask::execute() {
             opponentNotif.score_gained = res.resultPacket.score_gained;
             opponentNotif.total_score = res.opponentScore;  // Opponent's own score
             opponentNotif.current_round = res.resultPacket.current_round;
+            opponentNotif.is_your_turn = !res.resultPacket.is_your_turn;  // Opposite of guesser's turn
             
             broadcastPackets.push_back({res.opponentFd, opponentNotif.to_bytes()});
         }
@@ -280,6 +281,7 @@ void GuessWordTask::execute() {
             opponentNotif.current_round = res.resultPacket.current_round;
             opponentNotif.round_complete = res.resultPacket.round_complete;
             opponentNotif.next_word_pattern = res.resultPacket.next_word_pattern;
+            opponentNotif.is_your_turn = !res.resultPacket.is_your_turn;  // Opposite of guesser's turn
             
             broadcastPackets.push_back({res.opponentFd, opponentNotif.to_bytes()});
         }

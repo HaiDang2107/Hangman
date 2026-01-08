@@ -526,7 +526,6 @@ GuessWordResult MatchService::guessWord(const C2S_GuessWord& request) {
     result.resultPacket.remaining_attempts = state.remainingAttempts;
     result.resultPacket.score_gained = result.scoreGained;
     result.resultPacket.total_score = state.score;
-    result.resultPacket.current_round = match.currentRound;
     result.resultPacket.round_complete = false;
     
     // Find opponent
@@ -660,6 +659,9 @@ GuessWordResult MatchService::guessWord(const C2S_GuessWord& request) {
             }
         }
     }
+    
+    // Update current_round in response packet AFTER all round transitions
+    result.resultPacket.current_round = match.currentRound;
     
     // Switch turn if needed
     if (switchTurn && !opponentUsername.empty()) {

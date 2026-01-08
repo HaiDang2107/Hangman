@@ -8,6 +8,7 @@
 #include "ui/InviteDialog.h"
 #include "ui/PlayScreen.h"
 #include "ui/DrawRequestDialog.h"
+#include "ui/GameSummaryScreen.h"
 #include "network/GameClient.h"
 #include <string>
 #include <iostream>
@@ -73,6 +74,10 @@ struct GameEndNotification {
     std::string summary;
 };
 
+struct GameSummaryNotification {
+    S2C_GameSummary data;
+};
+
 std::queue<PendingInvite> g_pendingInvites;
 std::queue<InviteResponseNotification> g_inviteResponses;
 std::queue<PlayerReadyNotification> g_playerReadyUpdates;
@@ -81,6 +86,7 @@ std::queue<GuessCharResultNotification> g_guessCharResults;
 std::queue<GuessWordResultNotification> g_guessWordResults;
 std::queue<DrawRequestNotification> g_drawRequests;
 std::queue<GameEndNotification> g_gameEndNotifications;
+std::queue<GameSummaryNotification> g_gameSummaries;
 std::mutex g_notificationMutex;
 
 enum class AppScreen {
@@ -271,6 +277,11 @@ int main() {
             gameEnd.result_code,
             gameEnd.summary
         });
+    });
+    
+    client.setGameSummaryHandler([](const S2C_GameSummary& summary) {
+        std::lock_guard<std::mutex> lock(g_notificationMutex);
+        g_gameSummaries.push({summary});
     });
     
     LoginScreen loginScreen;
@@ -607,8 +618,14 @@ int main() {
                         }
                 }
                 
+                // Draw menu (will be redrawn after input or on invite)
                 mainMenuScreen.draw();
                 int result = mainMenuScreen.handleInput();
+                
+                // If no input (timeout), continue loop to check notifications
+                if (result == 0) {
+                    continue;
+                }
                 
                 switch(result) {
                     case 1:  // Create Room
@@ -1070,6 +1087,29 @@ int main() {
                                 
                                 // Redraw immediately to show changes
                                 playScreen.draw();
+                            }
+                            
+                            // Check game summary notifications
+                            if (!g_gameSummaries.empty()) {
+                                auto summary = g_gameSummaries.front();
+                                g_gameSummaries.pop();
+                                
+                                // Release lock before showing summary screen
+                                lock.unlock();
+                                
+                                // Show game summary
+                                GameSummaryScreen summaryScreen;
+                                summaryScreen.show(summary.data);
+                                summaryScreen.run();
+                                
+                                // Return to main menu after summary
+                                if (summaryScreen.shouldReturnToMenu()) {
+                                    inGame = false;
+                                    currentScreen = AppScreen::MAIN_MENU;
+                                }
+                                
+                                // Reacquire lock for next iteration
+                                lock.lock();
                             }
                         }
                     }

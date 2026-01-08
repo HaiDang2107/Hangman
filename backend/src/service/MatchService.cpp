@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <random>
 #include <algorithm>
+#include <sys/socket.h>
 
 namespace hangman {
 
@@ -264,6 +265,11 @@ GuessCharResult MatchService::guessChar(const C2S_GuessChar& request) {
         // Calculate score for correct guess
         result.scoreGained = calculateScore(match.currentRound, true, false, request.ch, match.currentWord);
         state.score += result.scoreGained;
+        
+        // Track score by round
+        if (match.currentRound == 1) state.round1Score += result.scoreGained;
+        else if (match.currentRound == 2) state.round2Score += result.scoreGained;
+        else if (match.currentRound == 3) state.round3Score += result.scoreGained;
     } else {
         // Wrong guess - no score penalty for character guess, but lose attempt
         if (state.remainingAttempts > 0) state.remainingAttempts--;
@@ -325,6 +331,9 @@ GuessCharResult MatchService::guessChar(const C2S_GuessChar& request) {
             state.finished = true;
             state.won = true;
             std::cout << "Player " << username << " completed Round 3 with score " << state.score << std::endl;
+            
+            // Send game summary to both players
+            sendGameSummary(request.room_id);
         }
     } else if (state.remainingAttempts == 0) {
         // Out of attempts in current round
@@ -360,6 +369,9 @@ GuessCharResult MatchService::guessChar(const C2S_GuessChar& request) {
             // Lost in round 3
             state.finished = true;
             state.won = false;
+            
+            // Send game summary to both players
+            sendGameSummary(request.room_id);
         }
     }
 
@@ -433,11 +445,23 @@ GuessWordResult MatchService::guessWord(const C2S_GuessWord& request) {
         uint32_t bonus = calculateScore(match.currentRound, true, true, '\0', match.currentWord);
         result.scoreGained = bonus;
         state.score += bonus;
+        
+        // Track score by round
+        if (match.currentRound == 1) state.round1Score += bonus;
+        else if (match.currentRound == 2) state.round2Score += bonus;
+        else if (match.currentRound == 3) state.round3Score += bonus;
     } else {
         // Wrong word guess - penalty
-        int32_t penalty = (match.currentRound == 1) ? 10 : 15;
-        if (state.score >= penalty) {
+        int32_t penalty = 10;
+        if (match.currentRound == 2) penalty = 15;
+        if (match.currentRound == 3) penalty = 20;
+        
+        if (state.score >= (uint32_t)penalty) {
             state.score -= penalty;
+            // Deduct from current round score
+            if (match.currentRound == 1 && state.round1Score >= (uint32_t)penalty) state.round1Score -= penalty;
+            else if (match.currentRound == 2 && state.round2Score >= (uint32_t)penalty) state.round2Score -= penalty;
+            else if (match.currentRound == 3 && state.round3Score >= (uint32_t)penalty) state.round3Score -= penalty;
         } else {
             state.score = 0;
         }
@@ -520,6 +544,9 @@ GuessWordResult MatchService::guessWord(const C2S_GuessWord& request) {
             result.gameEnded = true;
             
             std::cout << "Player " << username << " completed all rounds with score " << state.score << std::endl;
+            
+            // Send game summary to both players
+            sendGameSummary(request.room_id);
         }
     } else {
         // Wrong word guess - calculate penalty based on round
@@ -576,6 +603,9 @@ GuessWordResult MatchService::guessWord(const C2S_GuessWord& request) {
                 state.won = false;
                 result.gameEnded = true;
                 result.resultPacket.message = "Out of attempts! Final score: " + std::to_string(state.score);
+                
+                // Send game summary to both players
+                sendGameSummary(request.room_id);
             }
         }
     }
@@ -698,10 +728,78 @@ void MatchService::saveHistory(const std::string& username, const std::string& o
     
     std::ofstream file(ss.str());
     if (file.is_open()) {
-        // Format: match_id:opponent:result:timestamp:summary
-        file << "0" << ":" << opponent << ":" << (int)result << ":" << t << ":" << summary << "\n";
+        // Format: opponent:result:timestamp:summary
+        file << opponent << ":" << (int)result << ":" << t << ":" << summary << "\n";
         file.close();
     }
+}
+
+void MatchService::sendGameSummary(uint32_t roomId) {
+    std::lock_guard<std::mutex> lock(matchesMutex);
+    auto it = matches.find(roomId);
+    if (it == matches.end()) return;
+    
+    Match& match = it->second;
+    if (match.playerStates.size() != 2) return;
+    
+    // Get both players
+    auto playerIt = match.playerStates.begin();
+    std::string player1 = playerIt->first;
+    PlayerMatchState& state1 = playerIt->second;
+    playerIt++;
+    std::string player2 = playerIt->first;
+    PlayerMatchState& state2 = playerIt->second;
+    
+    // Create summary packet
+    S2C_GameSummary summary;
+    summary.player1_username = player1;
+    summary.player1_round1_score = state1.round1Score;
+    summary.player1_round2_score = state1.round2Score;
+    summary.player1_round3_score = state1.round3Score;
+    summary.player1_total_score = state1.score;
+    
+    summary.player2_username = player2;
+    summary.player2_round1_score = state2.round1Score;
+    summary.player2_round2_score = state2.round2Score;
+    summary.player2_round3_score = state2.round3Score;
+    summary.player2_total_score = state2.score;
+    
+    // Determine winner
+    if (state1.score > state2.score) {
+        summary.winner_username = player1;
+    } else if (state2.score > state1.score) {
+        summary.winner_username = player2;
+    } else {
+        summary.winner_username = "";  // Draw
+    }
+    
+    // Send to both players
+    int fd1 = AuthService::getInstance().getClientFd(player1);
+    int fd2 = AuthService::getInstance().getClientFd(player2);
+    
+    auto summaryBytes = summary.to_bytes();
+    
+    if (fd1 != -1) {
+        send(fd1, summaryBytes.data(), summaryBytes.size(), 0);
+    }
+    if (fd2 != -1) {
+        send(fd2, summaryBytes.data(), summaryBytes.size(), 0);
+    }
+    
+    // Save history for both players
+    std::string summaryText = "R1:" + std::to_string(state1.round1Score) + "/" + std::to_string(state2.round1Score) +
+                              " R2:" + std::to_string(state1.round2Score) + "/" + std::to_string(state2.round2Score) +
+                              " R3:" + std::to_string(state1.round3Score) + "/" + std::to_string(state2.round3Score) +
+                              " Total:" + std::to_string(state1.score) + "/" + std::to_string(state2.score);
+    
+    uint8_t result1 = (state1.score > state2.score) ? 1 : (state1.score < state2.score ? 0 : 2);  // 1=win, 0=loss, 2=draw
+    uint8_t result2 = (state2.score > state1.score) ? 1 : (state2.score < state1.score ? 0 : 2);
+    
+    saveHistory(player1, player2, result1, summaryText);
+    saveHistory(player2, player1, result2, summaryText);
+    
+    std::cout << "Game summary sent for room " << roomId << " - Winner: " << 
+                 (summary.winner_username.empty() ? "Draw" : summary.winner_username) << std::endl;
 }
 
 } // namespace hangman

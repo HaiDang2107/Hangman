@@ -21,6 +21,7 @@ using GuessCharResultHandler = std::function<void(const S2C_GuessCharResult&)>;
 using GuessWordResultHandler = std::function<void(const S2C_GuessWordResult&)>;
 using DrawRequestHandler = std::function<void(const S2C_DrawRequest&)>;
 using GameEndHandler = std::function<void(const S2C_GameEnd&)>;
+using GameSummaryHandler = std::function<void(const S2C_GameSummary&)>;
 
 class GameClient {
 public:
@@ -73,6 +74,7 @@ public:
     void setGuessWordResultHandler(GuessWordResultHandler handler) { onGuessWordResult = handler; }
     void setDrawRequestHandler(DrawRequestHandler handler) { onDrawRequest = handler; }
     void setGameEndHandler(GameEndHandler handler) { onGameEnd = handler; }
+    void setGameSummaryHandler(GameSummaryHandler handler) { onGameSummary = handler; }
     
     // Get current session token
     const std::string& getSessionToken() const { return sessionToken; }
@@ -107,6 +109,7 @@ private:
     GuessWordResultHandler onGuessWordResult;
     DrawRequestHandler onDrawRequest;
     GameEndHandler onGameEnd;
+    GameSummaryHandler onGameSummary;
 };
 
 } // namespace hangman

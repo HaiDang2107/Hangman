@@ -286,6 +286,24 @@ struct S2C_GameEnd {
     static S2C_GameEnd from_payload(ByteBuffer& bb);
 };
 
+struct S2C_GameSummary {
+    std::string player1_username;
+    uint32_t player1_round1_score;
+    uint32_t player1_round2_score;
+    uint32_t player1_round3_score;
+    uint32_t player1_total_score;
+    
+    std::string player2_username;
+    uint32_t player2_round1_score;
+    uint32_t player2_round2_score;
+    uint32_t player2_round3_score;
+    uint32_t player2_total_score;
+    
+    std::string winner_username;  // Empty if draw
+    std::vector<uint8_t> to_bytes() const;
+    static S2C_GameSummary from_payload(ByteBuffer& bb);
+};
+
 // Records / leaderboard
 struct C2S_RequestHistory {
     std::string session_token;

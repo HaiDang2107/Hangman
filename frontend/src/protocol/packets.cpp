@@ -804,6 +804,47 @@ namespace hangman
         return packet;
     }
 
+    std::vector<uint8_t> S2C_GameSummary::to_bytes() const {
+        ByteBuffer bb;
+        bb.write_string(player1_username);
+        bb.write_u32(player1_round1_score);
+        bb.write_u32(player1_round2_score);
+        bb.write_u32(player1_round3_score);
+        bb.write_u32(player1_total_score);
+        
+        bb.write_string(player2_username);
+        bb.write_u32(player2_round1_score);
+        bb.write_u32(player2_round2_score);
+        bb.write_u32(player2_round3_score);
+        bb.write_u32(player2_total_score);
+        
+        bb.write_string(winner_username);
+
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::S2C_GameSummary, bb.size());
+
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+    
+    S2C_GameSummary S2C_GameSummary::from_payload(ByteBuffer& bb) {
+        S2C_GameSummary packet;
+        packet.player1_username = bb.read_string();
+        packet.player1_round1_score = bb.read_u32();
+        packet.player1_round2_score = bb.read_u32();
+        packet.player1_round3_score = bb.read_u32();
+        packet.player1_total_score = bb.read_u32();
+        
+        packet.player2_username = bb.read_string();
+        packet.player2_round1_score = bb.read_u32();
+        packet.player2_round2_score = bb.read_u32();
+        packet.player2_round3_score = bb.read_u32();
+        packet.player2_total_score = bb.read_u32();
+        
+        packet.winner_username = bb.read_string();
+        return packet;
+    }
+
     std::vector<uint8_t> C2S_RequestHistory::to_bytes() const { throw std::runtime_error("Not implemented"); }
     C2S_RequestHistory C2S_RequestHistory::from_payload(ByteBuffer &) { throw std::runtime_error("Not implemented"); }
 

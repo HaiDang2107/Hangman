@@ -27,8 +27,6 @@ void RoomScreen::initWindows() {
 
     if (!player1Win || !player2Win) {
         std::cerr << "[ERROR RoomScreen] Failed to create player windows!" << std::endl;
-    } else {
-        std::cerr << "[DEBUG RoomScreen] Player windows created successfully" << std::endl;
     }
 }
 
@@ -333,11 +331,6 @@ int RoomScreen::handleInput() {
     if (ch != ERR && ch != KEY_RESIZE) {
     }
     
-    // Debug logging
-    if (ch != ERR) {
-        std::cerr << "RoomScreen got key: " << ch << " (isHost=" << isHost << ")" << std::endl;
-    }
-    
     // Handle timeout (ERR means no input available)
     if (ch == ERR) {
         return 0; // No input, continue
@@ -350,7 +343,6 @@ int RoomScreen::handleInput() {
     }
 
     if (ch == KEY_UP || ch == KEY_DOWN) {
-        std::cerr << "Processing navigation: " << (ch == KEY_UP ? "UP" : "DOWN") << std::endl;
         handleNavigation(ch);
         return 0;
     }

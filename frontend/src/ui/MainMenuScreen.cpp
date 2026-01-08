@@ -15,7 +15,7 @@ MainMenuScreen::MainMenuScreen()
     // Tạo main window
     mainWin = newwin(height, width, 0, 0);
     keypad(mainWin, TRUE);
-    wtimeout(mainWin, 100);  // 100ms timeout to check for notifications
+    wtimeout(mainWin, 100);  // 100ms timeout to check notifications
     
     // Tạo info window (user stats)
     int infoY = 2;
@@ -41,7 +41,7 @@ MainMenuScreen::~MainMenuScreen() {
 }
 
 void MainMenuScreen::drawBorder() {
-    box(mainWin, 0, 0);
+    // No border
 }
 
 void MainMenuScreen::drawTitle() {
@@ -60,8 +60,8 @@ void MainMenuScreen::drawTitle() {
 }
 
 void MainMenuScreen::drawUserInfo() {
-    // Draw info window border
-    box(infoWin, 0, 0);
+    // Clear and redraw info window
+    werase(infoWin);
     
     // Title
     wattron(infoWin, COLOR_PAIR(4) | A_BOLD);
@@ -85,11 +85,6 @@ void MainMenuScreen::drawUserInfo() {
     wattron(infoWin, COLOR_PAIR(4));
     mvwprintw(infoWin, 3, 11, "%d", userLevel);
     wattroff(infoWin, COLOR_PAIR(4));
-    
-    // Divider
-    wattron(infoWin, COLOR_PAIR(3) | A_DIM);
-    mvwprintw(infoWin, 4, 2, "────────────────────────────────────");
-    wattroff(infoWin, COLOR_PAIR(3) | A_DIM);
     
     // Wins
     wattron(infoWin, COLOR_PAIR(3));
@@ -171,27 +166,7 @@ void MainMenuScreen::drawInstructions() {
 }
 
 void MainMenuScreen::drawDecoration() {
-    // Draw some decorative elements
-    wattron(mainWin, COLOR_PAIR(5) | A_DIM);
-    
-    // Left side decoration
-    for (int i = 10; i < 24; i += 2) {
-        mvwprintw(mainWin, i, 2, "│");
-    }
-    
-    // Right side decoration (avoid info box area)
-    int rightX = width - 3;
-    for (int i = 10; i < 24; i += 2) {
-        if (i > INFO_BOX_HEIGHT + 3) {  // Below info box
-            mvwprintw(mainWin, i, rightX, "│");
-        }
-    }
-    
-    // Bottom decoration
-    mvwprintw(mainWin, 9, 2, "╔══════════════════════════════════╗");
-    mvwprintw(mainWin, 24, 2, "╚══════════════════════════════════╝");
-    
-    wattroff(mainWin, COLOR_PAIR(5) | A_DIM);
+    // No decorations
     
     // Welcome message
     wattron(mainWin, COLOR_PAIR(4));

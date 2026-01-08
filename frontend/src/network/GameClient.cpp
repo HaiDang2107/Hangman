@@ -404,6 +404,13 @@ void GameClient::handleNotification(const PacketHeader& header) {
             }
             break;
             
+        case PacketType::S2C_GameSummary:
+            if (onGameSummary) {
+                auto packet = S2C_GameSummary::from_payload(bb);
+                onGameSummary(packet);
+            }
+            break;
+            
         default:
             std::cerr << "Unknown notification type: " << static_cast<int>(header.type) << std::endl;
             break;

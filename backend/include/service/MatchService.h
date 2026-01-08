@@ -13,7 +13,10 @@ struct PlayerMatchState {
     std::string username;
     std::set<char> guessedChars;
     uint8_t remainingAttempts = 6; // Standard hangman lives
-    uint32_t score = 0;  // Player's score
+    uint32_t score = 0;  // Player's total score
+    uint32_t round1Score = 0;  // Score earned in round 1
+    uint32_t round2Score = 0;  // Score earned in round 2
+    uint32_t round3Score = 0;  // Score earned in round 3
     bool finished = false;
     bool won = false;
 };
@@ -87,6 +90,9 @@ public:
 
     // End Game (Resign or explicit end)
     EndGameResult endGame(const C2S_EndGame& request);
+    
+    // Send game summary to both players
+    void sendGameSummary(uint32_t roomId);
     
     // Get opponent's exposed pattern after a guess
     std::string getOpponentPattern(uint32_t roomId, const std::string& guesserUsername, 

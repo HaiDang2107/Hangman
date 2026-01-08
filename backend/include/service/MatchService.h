@@ -24,7 +24,8 @@ struct Match {
     std::string currentWord;  // Current round's word
     std::string round1Word;   // Round 1 word (saved for reference)
     std::string round2Word;   // Round 2 word (saved for reference)
-    uint8_t currentRound = 1; // 1 or 2
+    std::string round3Word;   // Round 3 word (saved for reference)
+    uint8_t currentRound = 1; // 1, 2, or 3
     std::set<char> revealedChars;  // All correctly guessed chars (shared between players)
     std::unordered_map<std::string, PlayerMatchState> playerStates;
     bool active = true;
@@ -103,6 +104,7 @@ private:
     
     std::vector<std::string> round1Words;  // Words for round 1 (4-7 letters)
     std::vector<std::string> round2Words;  // Words for round 2 (8-12 letters)
+    std::vector<std::string> round3Words;  // Words for round 3 (10-15 letters)
     
     void loadWords();  // Load words from files
     std::string getRandomWord(uint8_t round);  // Get random word for round

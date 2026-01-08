@@ -118,7 +118,7 @@ void PlayScreen::drawGameInfo(int y, int x) {
     
     // Round and Score
     attron(COLOR_PAIR(2) | A_BOLD);
-    mvprintw(y + 1, x, "Round: %d/2  |  Score: %u", currentRound, currentScore);
+    mvprintw(y + 1, x, "Round: %d/3  |  Score: %u", currentRound, currentScore);
     attroff(COLOR_PAIR(2) | A_BOLD);
     
     // Players
@@ -416,11 +416,11 @@ int PlayScreen::handleInput() {
                             // No round change - update round normally
                             setRound(response.current_round);
                             
-                            if (wordCompleteInOldRound && response.current_round == 2) {
-                                // Completed round 2 - game over
-                                setGameOver(true, "You won both rounds! Final score: " + std::to_string(response.total_score));
-                            } else if (response.remaining_attempts == 0 && response.current_round == 2) {
-                                // Out of attempts in round 2
+                            if (wordCompleteInOldRound && response.current_round == 3) {
+                                // Completed round 3 - game over
+                                setGameOver(true, "You won all 3 rounds! Final score: " + std::to_string(response.total_score));
+                            } else if (response.remaining_attempts == 0 && response.current_round == 3) {
+                                // Out of attempts in round 3
                                 setGameOver(false, "Out of attempts! Final score: " + std::to_string(response.total_score));
                             } else {
                                 inputMode = InputMode::NORMAL;
@@ -469,24 +469,24 @@ int PlayScreen::handleInput() {
                         } else {
                             setRound(response.current_round);
                             
-                            if (response.correct && response.current_round == 2) {
-                                // Correct guess in round 2 - game over
+                            if (response.correct && response.current_round == 3) {
+                                // Correct guess in round 3 - game over
                                 setGameOver(true, "You guessed the word: " + guess + "! Final score: " + std::to_string(response.total_score));
-                            } else if (response.correct && response.current_round == 1) {
+                            } else if (response.correct && (response.current_round == 1 || response.current_round == 2)) {
                                 // This shouldn't happen (server should set round_complete), but handle it
                                 handleRoundTransition(response.next_word_pattern);
-                                gameMessage = "Correct! Moving to Round 2!";
+                                gameMessage = "Correct! Moving to next round!";
                                 isMyTurn = true;
                             } else {
                                 setRemainingAttempts(response.remaining_attempts);
                                 gameMessage = response.message;
                                 
-                                if (response.remaining_attempts == 0 && response.current_round == 2) {
+                                if (response.remaining_attempts == 0 && response.current_round == 3) {
                                     setGameOver(false, "Out of attempts! Final score: " + std::to_string(response.total_score));
-                                } else if (response.remaining_attempts == 0 && response.current_round == 1) {
+                                } else if (response.remaining_attempts == 0 && (response.current_round == 1 || response.current_round == 2)) {
                                     // This shouldn't happen (server should set round_complete), but handle it
                                     handleRoundTransition(response.next_word_pattern);
-                                    gameMessage = "Out of attempts! Moving to Round 2.";
+                                    gameMessage = "Out of attempts! Moving to next round.";
                                     isMyTurn = true;
                                 } else {
                                     isMyTurn = false;  // Turn switches to opponent

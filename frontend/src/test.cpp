@@ -1006,8 +1006,8 @@ int main() {
                                     } else {
                                         playScreen.setRound(result.currentRound);
                                         
-                                        if (result.correct && result.currentRound == 2) {
-                                            // Opponent won in round 2 - game over
+                                        if (result.correct && result.currentRound == 3) {
+                                            // Opponent won in round 3 - game over
                                             playScreen.setGameOver(false, "Opponent guessed the word! They scored " + std::to_string(result.totalScore));
                                         } else {
                                             playScreen.setRemainingAttempts(result.remainingAttempts);

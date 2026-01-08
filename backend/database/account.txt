@@ -3,3 +3,5 @@ user2:123:30:40
 testuser3:testpass:0:0
 testuser2:testpass:0:0
 haidang:123456:0:0
+huanchuoi123:huanchuoi123:0:0
+huan123:huan123:0:0

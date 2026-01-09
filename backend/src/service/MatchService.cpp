@@ -765,6 +765,19 @@ EndGameResult MatchService::endGame(const C2S_EndGame& request) {
 
     // If resignation, opponent wins
     if (request.result_code == 0) {
+        // Mark this player as surrendered
+        if (userStateIt != match.playerStates.end()) {
+            userStateIt->second.surrendered = true;
+            userStateIt->second.finished = true;
+            userStateIt->second.won = false;
+        }
+        
+        // Mark opponent as winner
+        if (oppStateIt != match.playerStates.end()) {
+            oppStateIt->second.finished = true;
+            oppStateIt->second.won = true;
+        }
+        
         AuthService::getInstance().updateUserStats(opponentName, true, 10);
         
         if (oppStateIt != match.playerStates.end()) {
@@ -854,8 +867,14 @@ S2C_GameSummary MatchService::requestSummary(const C2S_RequestSummary& request) 
     summary.player2_round3_score = state2.round3Score;
     summary.player2_total_score = state2.score;
     
-    // Determine winner
-    if (state1.score > state2.score) {
+    // Determine winner - priority: surrender > score
+    if (state1.surrendered) {
+        // Player 1 surrendered, player 2 wins
+        summary.winner_username = player2;
+    } else if (state2.surrendered) {
+        // Player 2 surrendered, player 1 wins
+        summary.winner_username = player1;
+    } else if (state1.score > state2.score) {
         summary.winner_username = player1;
     } else if (state2.score > state1.score) {
         summary.winner_username = player2;

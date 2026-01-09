@@ -19,6 +19,7 @@ struct PlayerMatchState {
     uint32_t round3Score = 0;  // Score earned in round 3
     bool finished = false;
     bool won = false;
+    bool surrendered = false;  // Track if player surrendered
 };
 
 struct Match {

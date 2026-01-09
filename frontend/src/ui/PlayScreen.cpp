@@ -30,7 +30,8 @@ PlayScreen::PlayScreen(const std::string& roomName,
       summaryReceived(false),
       waitingForSummaryTicks(0),
       inputMode(InputMode::NORMAL),
-      selectedMenuOption(0) {
+      selectedMenuOption(0),
+      needsFullRedraw(true) {  // Start with full redraw
     
     // Initialize word pattern with blanks
     wordPattern = "";
@@ -46,8 +47,9 @@ PlayScreen::PlayScreen(const std::string& roomName,
 }
 
 void PlayScreen::initInput() {
-    // halfdelay mode: getch() waits max 1 decisecond (100ms)
-    halfdelay(1);  // 1 decisecond = 100ms
+    // halfdelay mode: getch() waits max 3 deciseconds (300ms)
+    // This reduces screen flickering while keeping responsive input
+    halfdelay(3);  // 3 deciseconds = 300ms
 }
 
 void PlayScreen::drawHangman(int y, int x, int wrongGuesses) {
@@ -241,7 +243,11 @@ void PlayScreen::drawGameOverScreen() {
 }
 
 void PlayScreen::draw() {
-    clear();
+    // Only clear on full redraw (state changes, not every frame)
+    if (needsFullRedraw) {
+        clear();
+        needsFullRedraw = false;
+    }
     
     if (gameOver) {
         drawGameOverScreen();
@@ -334,6 +340,7 @@ int PlayScreen::handleInput() {
                     switch (selectedMenuOption) {
                         case 0:  // Resume
                             inputMode = InputMode::NORMAL;
+                            needsFullRedraw = true;
                             break;
                         case 1:  // Request Draw
                             try {
@@ -361,6 +368,7 @@ int PlayScreen::handleInput() {
                     break;
                 case 27:  // ESC
                     inputMode = InputMode::NORMAL;
+                    needsFullRedraw = true;
                     break;
             }
             break;
@@ -369,6 +377,7 @@ int PlayScreen::handleInput() {
             if (ch == 27) {  // ESC
                 inputMode = InputMode::NORMAL;
                 gameMessage = "";
+                needsFullRedraw = true;
             } else if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')) {
                 char guess = toupper(ch);
                 
@@ -462,6 +471,7 @@ int PlayScreen::handleInput() {
                 inputMode = InputMode::NORMAL;
                 wordInput.clear();
                 gameMessage = "";
+                needsFullRedraw = true;
             } else if (ch == 10 || ch == 13) {  // ENTER
                 if (!wordInput.empty()) {
                     // Send C2S_GuessWord packet
@@ -538,6 +548,7 @@ int PlayScreen::handleInput() {
                     if (isMyTurn && !gameOver) {
                         inputMode = InputMode::GUESS_CHAR;
                         gameMessage = "";
+                        needsFullRedraw = true;
                     } else if (!isMyTurn) {
                         gameMessage = "Wait for your turn!";
                     }
@@ -549,6 +560,7 @@ int PlayScreen::handleInput() {
                         inputMode = InputMode::GUESS_WORD;
                         wordInput.clear();
                         gameMessage = "";
+                        needsFullRedraw = true;
                     } else if (!isMyTurn) {
                         gameMessage = "Wait for your turn!";
                     }
@@ -558,11 +570,13 @@ int PlayScreen::handleInput() {
                 case 'M':
                     inputMode = InputMode::MENU;
                     selectedMenuOption = 0;
+                    needsFullRedraw = true;
                     break;
                     
                 case 27:  // ESC - Quick exit
                     inputMode = InputMode::MENU;
                     selectedMenuOption = 3;  // Exit option
+                    needsFullRedraw = true;
                     break;
             }
             break;
@@ -574,6 +588,7 @@ int PlayScreen::handleInput() {
 // Game state update methods
 void PlayScreen::updateWordPattern(const std::string& pattern) {
     wordPattern = pattern;
+    needsFullRedraw = true;
 }
 
 void PlayScreen::addGuessedChar(char ch) {
@@ -592,6 +607,7 @@ void PlayScreen::setGameOver(bool won, const std::string& message) {
     gameOver = true;
     iWon = won;
     gameMessage = message;
+    needsFullRedraw = true;
 }
 
 void PlayScreen::setGameMessage(const std::string& msg) {
@@ -615,10 +631,14 @@ void PlayScreen::handleRoundTransition(const std::string& newPattern) {
     remainingAttempts = 6;
     // Update game message
     gameMessage = "Round " + std::to_string(currentRound) + " started!";
+    needsFullRedraw = true;
 }
 
 void PlayScreen::setSummaryReceived(bool received) {
     summaryReceived = received;
+    if (received) {
+        needsFullRedraw = true;
+    }
 }
 
 void PlayScreen::processNotifications() {

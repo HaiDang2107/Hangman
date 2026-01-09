@@ -44,6 +44,7 @@ private:
     InputMode inputMode;
     std::string wordInput;        // Buffer for word guess
     int selectedMenuOption;
+    bool needsFullRedraw;         // Track if full screen redraw is needed
     
     // UI helpers
     void drawHangman(int y, int x, int wrongGuesses);

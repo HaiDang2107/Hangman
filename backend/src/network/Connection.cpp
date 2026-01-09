@@ -90,7 +90,7 @@ bool Connection::receiveData() {
 
     if (nread < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            // No data available right now
+            // No data available right now ==> Non-blocking
             return true;
         }
         // Real error

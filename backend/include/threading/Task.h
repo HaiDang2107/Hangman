@@ -303,6 +303,22 @@ private:
     std::vector<std::pair<int, std::vector<uint8_t>>> broadcastPackets;
 };
 
+// ============ Request Summary Task ============
+class RequestSummaryTask : public Task {
+public:
+    RequestSummaryTask(int clientFd, const C2S_RequestSummary& request)
+        : clientFd(clientFd), request(request) {}
+
+    void execute() override;
+    int getClientFd() const override { return clientFd; }
+    std::vector<uint8_t> getResponsePacket() const override;
+
+private:
+    int clientFd;
+    C2S_RequestSummary request;
+    S2C_GameSummary result;
+};
+
 // ============ Request History Task ============
 class RequestHistoryTask : public Task {
 public:

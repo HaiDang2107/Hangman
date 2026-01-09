@@ -358,6 +358,13 @@ namespace hangman
                     break;
                 }
 
+                case static_cast<uint16_t>(PacketType::C2S_RequestSummary): {
+                    C2S_RequestSummary req = C2S_RequestSummary::from_payload(buf);
+                    auto task = std::make_shared<RequestSummaryTask>(clientFd, req);
+                    taskQueue->push(task);
+                    break;
+                }
+
                 case static_cast<uint16_t>(PacketType::C2S_RequestHistory): {
                     C2S_RequestHistory req = C2S_RequestHistory::from_payload(buf);
                     auto task = std::make_shared<RequestHistoryTask>(clientFd, req);

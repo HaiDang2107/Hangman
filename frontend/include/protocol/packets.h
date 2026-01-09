@@ -288,6 +288,14 @@ struct S2C_GameEnd {
     static S2C_GameEnd from_payload(ByteBuffer& bb);
 };
 
+struct C2S_RequestSummary {
+    std::string session_token;
+    uint32_t room_id;
+    uint32_t match_id;
+    std::vector<uint8_t> to_bytes() const;
+    static C2S_RequestSummary from_payload(ByteBuffer& bb);
+};
+
 struct S2C_GameSummary {
     std::string player1_username;
     uint32_t player1_round1_score;

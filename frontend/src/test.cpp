@@ -1095,26 +1095,12 @@ int main() {
                             }
                             
                             // Check game summary notifications
-                            if (!g_gameSummaries.empty()) {
-                                auto summary = g_gameSummaries.front();
-                                g_gameSummaries.pop();
+                            if (!g_gameSummaries.empty() && playScreen.isGameOver()) {
+                                // Mark that summary has been received
+                                playScreen.setSummaryReceived(true);
                                 
-                                // Release lock before showing summary screen
-                                lock.unlock();
-                                
-                                // Show game summary
-                                GameSummaryScreen summaryScreen;
-                                summaryScreen.show(summary.data);
-                                summaryScreen.run();
-                                
-                                // Return to main menu after summary
-                                if (summaryScreen.shouldReturnToMenu()) {
-                                    inGame = false;
-                                    currentScreen = AppScreen::MAIN_MENU;
-                                }
-                                
-                                // Reacquire lock for next iteration
-                                lock.lock();
+                                // Redraw to update the message to "Press any key to view detailed results..."
+                                playScreen.draw();
                             }
                         }
                     }
@@ -1122,7 +1108,30 @@ int main() {
                     int result = playScreen.handleInput();
                     
                     if (result == -1) {
-                        // Exit game
+                        // Exit to menu without viewing summary
+                        showMessage("Game Ended", "Returning to main menu...", 2);
+                        napms(1500);
+                        inGame = false;
+                        currentScreen = AppScreen::MAIN_MENU;
+                    } else if (result == -3) {
+                        // Request to view summary
+                        GameClient& client = GameClient::getInstance();
+                        
+                        // Request summary from server
+                        S2C_GameSummary summary = client.requestSummary(playScreen.getRoomId(), playScreen.getMatchId());
+                        
+                        // Check if summary is valid (has player names)
+                        if (!summary.player1_username.empty()) {
+                            // Show game summary
+                            GameSummaryScreen summaryScreen;
+                            summaryScreen.show(summary);
+                            summaryScreen.run();
+                        } else {
+                            showMessage("Error", "Could not load game summary", 2);
+                            napms(1500);
+                        }
+                        
+                        // After viewing summary, return to menu
                         showMessage("Game Ended", "Returning to main menu...", 2);
                         napms(1500);
                         inGame = false;

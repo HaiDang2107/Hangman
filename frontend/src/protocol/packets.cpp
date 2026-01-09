@@ -808,6 +808,27 @@ namespace hangman
         return packet;
     }
 
+    std::vector<uint8_t> C2S_RequestSummary::to_bytes() const {
+        ByteBuffer bb;
+        bb.write_string(session_token);
+        bb.write_u32(room_id);
+        bb.write_u32(match_id);
+
+        std::vector<uint8_t> header_bytes =
+            PacketHeader::encode_header(PROTOCOL_VERSION, PacketType::C2S_RequestSummary, bb.size());
+
+        header_bytes.insert(header_bytes.end(), bb.buf.begin(), bb.buf.end());
+        return header_bytes;
+    }
+    
+    C2S_RequestSummary C2S_RequestSummary::from_payload(ByteBuffer& bb) {
+        C2S_RequestSummary packet;
+        packet.session_token = bb.read_string();
+        packet.room_id = bb.read_u32();
+        packet.match_id = bb.read_u32();
+        return packet;
+    }
+
     std::vector<uint8_t> S2C_GameSummary::to_bytes() const {
         ByteBuffer bb;
         bb.write_string(player1_username);

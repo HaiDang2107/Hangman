@@ -340,6 +340,16 @@ std::vector<std::pair<int, std::vector<uint8_t>>> EndGameTask::getBroadcastPacke
     return broadcastPackets;
 }
 
+// ============ RequestSummaryTask ============
+
+void RequestSummaryTask::execute() {
+    result = MatchService::getInstance().requestSummary(request);
+}
+
+std::vector<uint8_t> RequestSummaryTask::getResponsePacket() const {
+    return result.to_bytes();
+}
+
 // ============ RequestHistoryTask ============
 
 void RequestHistoryTask::execute() {

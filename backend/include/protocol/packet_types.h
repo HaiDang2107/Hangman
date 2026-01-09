@@ -58,7 +58,8 @@ enum class PacketType : uint16_t {
     S2C_DrawRequest        = 0x0506,
     C2S_EndGame            = 0x0507,
     S2C_GameEnd            = 0x0508,
-    S2C_GameSummary        = 0x0509,
+    C2S_RequestSummary     = 0x0509,
+    S2C_GameSummary        = 0x050A,
 
     // Records / leaderboard
     C2S_RequestHistory     = 0x0601,

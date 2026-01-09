@@ -60,6 +60,7 @@ public:
     S2C_GuessWordResult guessWord(uint32_t roomId, uint32_t matchId, const std::string& word);
     void requestDraw(uint32_t roomId, uint32_t matchId);
     S2C_GameEnd endGame(uint32_t roomId, uint32_t matchId, uint8_t resultCode, const std::string& message);
+    S2C_GameSummary requestSummary(uint32_t roomId, uint32_t matchId);
     
     // Event loop management
     void startEventLoop();

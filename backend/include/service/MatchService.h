@@ -92,6 +92,9 @@ public:
     // End Game (Resign or explicit end)
     EndGameResult endGame(const C2S_EndGame& request);
     
+    // Request game summary
+    S2C_GameSummary requestSummary(const C2S_RequestSummary& request);
+    
     // Send game summary to both players
     void sendGameSummary(uint32_t roomId);
     

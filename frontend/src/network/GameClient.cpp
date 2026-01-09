@@ -284,6 +284,15 @@ S2C_GameEnd GameClient::endGame(uint32_t roomId, uint32_t matchId, uint8_t resul
     return sendAndReceive<S2C_GameEnd>(request.to_bytes());
 }
 
+S2C_GameSummary GameClient::requestSummary(uint32_t roomId, uint32_t matchId) {
+    C2S_RequestSummary request;
+    request.session_token = sessionToken;
+    request.room_id = roomId;
+    request.match_id = matchId;
+    
+    return sendAndReceive<S2C_GameSummary>(request.to_bytes());
+}
+
 void GameClient::startEventLoop() {
     if (eventLoopRunning) return;
     

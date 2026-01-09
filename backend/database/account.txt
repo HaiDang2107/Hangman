@@ -1,5 +1,5 @@
-testuser:testpass:0:0
+testuser:testpass:3:31
 user2:123:30:40
 testuser3:testpass:0:0
 testuser2:testpass:0:0
-haidang:123456:2:20
+haidang:123456:6:61

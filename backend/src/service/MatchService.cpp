@@ -354,8 +354,8 @@ GuessCharResult MatchService::guessChar(const C2S_GuessChar& request) {
             state.won = true;
             std::cout << "Player " << username << " completed Round 3 with score " << state.score << std::endl;
             
-            // Send game summary to both players
-            sendGameSummary(request.room_id);
+            // Note: Game summary will be sent when client requests it via C2S_RequestSummary
+            // sendGameSummary(request.room_id);d);
         }
     } else if (state.remainingAttempts == 0) {
         // Out of attempts in current round
@@ -393,8 +393,8 @@ GuessCharResult MatchService::guessChar(const C2S_GuessChar& request) {
             state.finished = true;
             state.won = false;
             
-            // Send game summary to both players
-            sendGameSummary(request.room_id);
+            // Note: Game summary will be sent when client requests it
+            // sendGameSummary(request.room_id);
         }
     }
     
@@ -594,8 +594,8 @@ GuessWordResult MatchService::guessWord(const C2S_GuessWord& request) {
             
             std::cout << "Player " << username << " completed all rounds with score " << state.score << std::endl;
             
-            // Send game summary to both players
-            sendGameSummary(request.room_id);
+            // Note: Game summary will be sent when client requests it
+            // sendGameSummary(request.room_id);
         }
     } else {
         // Wrong word guess - calculate penalty based on round
@@ -654,8 +654,8 @@ GuessWordResult MatchService::guessWord(const C2S_GuessWord& request) {
                 result.gameEnded = true;
                 result.resultPacket.message = "Out of attempts! Final score: " + std::to_string(state.score);
                 
-                // Send game summary to both players
-                sendGameSummary(request.room_id);
+                // Note: Game summary will be sent when client requests it
+                // sendGameSummary(request.room_id);
             }
         }
     }
@@ -771,10 +771,68 @@ EndGameResult MatchService::endGame(const C2S_EndGame& request) {
     result.endPacket.result_code = request.result_code;
     result.endPacket.summary = "Game Over";
 
+    // Note: We no longer automatically send game summary here
+    // Client will request it manually when user presses "View Summary"
+    
     // Clean up match if both finished?
     // For now keep it simple.
     
     return result;
+}
+
+S2C_GameSummary MatchService::requestSummary(const C2S_RequestSummary& request) {
+    S2C_GameSummary summary;
+    
+    std::string username;
+    if (!AuthService::getInstance().validateSession(request.session_token, username)) {
+        // Return empty summary on auth failure
+        return summary;
+    }
+
+    std::lock_guard<std::mutex> lock(matchesMutex);
+    auto it = matches.find(request.room_id);
+    if (it == matches.end()) {
+        // Match not found - return empty summary
+        return summary;
+    }
+    
+    Match& match = it->second;
+    if (match.playerStates.size() != 2) {
+        // Invalid match state
+        return summary;
+    }
+    
+    // Get both players
+    auto playerIt = match.playerStates.begin();
+    std::string player1 = playerIt->first;
+    PlayerMatchState& state1 = playerIt->second;
+    playerIt++;
+    std::string player2 = playerIt->first;
+    PlayerMatchState& state2 = playerIt->second;
+    
+    // Create summary packet
+    summary.player1_username = player1;
+    summary.player1_round1_score = state1.round1Score;
+    summary.player1_round2_score = state1.round2Score;
+    summary.player1_round3_score = state1.round3Score;
+    summary.player1_total_score = state1.score;
+    
+    summary.player2_username = player2;
+    summary.player2_round1_score = state2.round1Score;
+    summary.player2_round2_score = state2.round2Score;
+    summary.player2_round3_score = state2.round3Score;
+    summary.player2_total_score = state2.score;
+    
+    // Determine winner
+    if (state1.score > state2.score) {
+        summary.winner_username = player1;
+    } else if (state2.score > state1.score) {
+        summary.winner_username = player2;
+    } else {
+        summary.winner_username = "";  // Draw
+    }
+    
+    return summary;
 }
 
 void MatchService::saveHistory(const std::string& username, const std::string& opponent, uint8_t result, const std::string& summary) {

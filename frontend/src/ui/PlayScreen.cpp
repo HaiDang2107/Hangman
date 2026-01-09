@@ -27,6 +27,8 @@ PlayScreen::PlayScreen(const std::string& roomName,
       isMyTurn(isHost),  // Host starts first
       gameOver(false),
       iWon(false),
+      summaryReceived(false),
+      waitingForSummaryTicks(0),
       inputMode(InputMode::NORMAL),
       selectedMenuOption(0) {
     
@@ -206,7 +208,7 @@ void PlayScreen::drawGameOverScreen() {
     
     // Draw semi-transparent overlay effect
     attron(COLOR_PAIR(1) | A_BOLD);
-    for (int i = centerY - 2; i < centerY + 8; i++) {
+    for (int i = centerY - 2; i < centerY + 10; i++) {
         mvprintw(i, centerX - 25, "%50s", " ");
     }
     attroff(COLOR_PAIR(1) | A_BOLD);
@@ -231,9 +233,10 @@ void PlayScreen::drawGameOverScreen() {
     mvprintw(centerY + 4, centerX - gameMessage.length() / 2, "%s", gameMessage.c_str());
     attroff(COLOR_PAIR(5));
     
-    // Exit instruction
+    // Options
     attron(COLOR_PAIR(6));
-    mvprintw(centerY + 6, centerX - 20, "Press any key to return to menu...");
+    mvprintw(centerY + 6, centerX - 15, "[V] View Summary");
+    mvprintw(centerY + 7, centerX - 15, "[ESC] Return to Menu");
     attroff(COLOR_PAIR(6));
 }
 
@@ -292,9 +295,21 @@ void PlayScreen::draw() {
 
 int PlayScreen::handleInput() {
     if (gameOver) {
-        cbreak();  // Reset to normal mode
-        getch();  // Wait for any key
-        return -1;  // Exit to menu
+        int ch = getch();
+        
+        // V key - View Summary
+        if (ch == 'v' || ch == 'V') {
+            return -3;  // Request to view summary
+        }
+        
+        // ESC key - Exit to menu
+        if (ch == 27) {  // ESC
+            cbreak();
+            return -1;  // Exit to menu
+        }
+        
+        // Otherwise, continue waiting
+        return 0;
     }
     
     int ch = getch();
@@ -600,6 +615,10 @@ void PlayScreen::handleRoundTransition(const std::string& newPattern) {
     remainingAttempts = 6;
     // Update game message
     gameMessage = "Round " + std::to_string(currentRound) + " started!";
+}
+
+void PlayScreen::setSummaryReceived(bool received) {
+    summaryReceived = received;
 }
 
 void PlayScreen::processNotifications() {

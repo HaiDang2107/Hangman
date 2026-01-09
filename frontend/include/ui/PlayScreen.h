@@ -36,6 +36,8 @@ private:
     bool isMyTurn;
     bool gameOver;
     bool iWon;
+    bool summaryReceived;     // Track if summary has been received
+    int waitingForSummaryTicks;  // Counter for timeout (in halfdelay ticks)
     std::string gameMessage;
     
     // Input state
@@ -79,6 +81,7 @@ public:
     void setScore(uint32_t score);
     void setRound(uint8_t round);
     void handleRoundTransition(const std::string& newPattern);
+    void setSummaryReceived(bool received);
     
     // Getters
     bool isGameOver() const { return gameOver; }

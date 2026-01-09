@@ -747,17 +747,48 @@ EndGameResult MatchService::endGame(const C2S_EndGame& request) {
 
     // Update this user
     AuthService::getInstance().updateUserStats(username, isWin, points);
-    saveHistory(username, opponentName, request.result_code, summary);
+    
+    // Get scores from match if available
+    auto userStateIt = match.playerStates.find(username);
+    auto oppStateIt = match.playerStates.find(opponentName);
+    
+    if (userStateIt != match.playerStates.end()) {
+        // Save with detailed scores
+        saveHistoryWithScores(username, opponentName, request.result_code, 
+                             userStateIt->second.round1Score, 
+                             userStateIt->second.round2Score, 
+                             userStateIt->second.round3Score);
+    } else {
+        // Fallback to old format if no match data
+        saveHistory(username, opponentName, request.result_code, summary);
+    }
 
     // If resignation, opponent wins
     if (request.result_code == 0) {
         AuthService::getInstance().updateUserStats(opponentName, true, 10);
-        saveHistory(opponentName, username, 1, "Opponent resigned");
+        
+        if (oppStateIt != match.playerStates.end()) {
+            // Save with detailed scores
+            saveHistoryWithScores(opponentName, username, 1, 
+                                 oppStateIt->second.round1Score, 
+                                 oppStateIt->second.round2Score, 
+                                 oppStateIt->second.round3Score);
+        } else {
+            saveHistory(opponentName, username, 1, "Opponent resigned");
+        }
     } 
     // If draw, update opponent too (assuming both agreed)
     else if (request.result_code == 3) {
         AuthService::getInstance().updateUserStats(opponentName, false, 1);
-        saveHistory(opponentName, username, 3, "Draw");
+        
+        if (oppStateIt != match.playerStates.end()) {
+            saveHistoryWithScores(opponentName, username, 3, 
+                                 oppStateIt->second.round1Score, 
+                                 oppStateIt->second.round2Score, 
+                                 oppStateIt->second.round3Score);
+        } else {
+            saveHistory(opponentName, username, 3, "Draw");
+        }
     }
     // If win/loss, opponent update might happen when they send EndGame?
     // Or we update both now?
@@ -836,19 +867,42 @@ S2C_GameSummary MatchService::requestSummary(const C2S_RequestSummary& request) 
 }
 
 void MatchService::saveHistory(const std::string& username, const std::string& opponent, uint8_t result, const std::string& summary) {
-    std::string dir = "database/history/" + username;
+    std::string dir = "database/history";
     try {
         std::filesystem::create_directories(dir);
     } catch (...) {}
 
     std::time_t t = std::time(nullptr);
-    std::stringstream ss;
-    ss << dir << "/" << t << ".txt";
+    std::string filepath = dir + "/" + username + ".txt";
     
-    std::ofstream file(ss.str());
+    std::ofstream file(filepath, std::ios::app);  // Append mode
     if (file.is_open()) {
-        // Format: opponent:result:timestamp:summary
-        file << opponent << ":" << (int)result << ":" << t << ":" << summary << "\n";
+        // Format: datetime:opponent:result:summary
+        char datetime[20];
+        std::strftime(datetime, sizeof(datetime), "%Y-%m-%d %H:%M:%S", std::localtime(&t));
+        file << datetime << ":" << opponent << ":" << (int)result << ":" << summary << "\n";
+        file.close();
+    }
+}
+
+void MatchService::saveHistoryWithScores(const std::string& username, const std::string& opponent, 
+                                         uint8_t result, uint32_t r1Score, uint32_t r2Score, uint32_t r3Score) {
+    std::string dir = "database/history";
+    try {
+        std::filesystem::create_directories(dir);
+    } catch (...) {}
+
+    std::time_t t = std::time(nullptr);
+    std::string filepath = dir + "/" + username + ".txt";
+    
+    std::ofstream file(filepath, std::ios::app);  // Append mode
+    if (file.is_open()) {
+        // Format: datetime:opponent:win/lose:r1_score:r2_score:r3_score
+        char datetime[20];
+        std::strftime(datetime, sizeof(datetime), "%Y-%m-%d %H:%M:%S", std::localtime(&t));
+        std::string resultStr = (result == 1) ? "win" : (result == 0) ? "lose" : "draw";
+        file << datetime << ":" << opponent << ":" << resultStr << ":" 
+             << r1Score << ":" << r2Score << ":" << r3Score << "\n";
         file.close();
     }
 }
@@ -905,17 +959,12 @@ void MatchService::sendGameSummary(uint32_t roomId) {
         send(fd2, summaryBytes.data(), summaryBytes.size(), 0);
     }
     
-    // Save history for both players
-    std::string summaryText = "R1:" + std::to_string(state1.round1Score) + "/" + std::to_string(state2.round1Score) +
-                              " R2:" + std::to_string(state1.round2Score) + "/" + std::to_string(state2.round2Score) +
-                              " R3:" + std::to_string(state1.round3Score) + "/" + std::to_string(state2.round3Score) +
-                              " Total:" + std::to_string(state1.score) + "/" + std::to_string(state2.score);
-    
+    // Save history for both players with detailed scores
     uint8_t result1 = (state1.score > state2.score) ? 1 : (state1.score < state2.score ? 0 : 2);  // 1=win, 0=loss, 2=draw
     uint8_t result2 = (state2.score > state1.score) ? 1 : (state2.score < state1.score ? 0 : 2);
     
-    saveHistory(player1, player2, result1, summaryText);
-    saveHistory(player2, player1, result2, summaryText);
+    saveHistoryWithScores(player1, player2, result1, state1.round1Score, state1.round2Score, state1.round3Score);
+    saveHistoryWithScores(player2, player1, result2, state2.round1Score, state2.round2Score, state2.round3Score);
     
     std::cout << "Game summary sent for room " << roomId << " - Winner: " << 
                  (summary.winner_username.empty() ? "Draw" : summary.winner_username) << std::endl;

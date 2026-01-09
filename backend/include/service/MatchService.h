@@ -122,6 +122,8 @@ private:
 
     std::string getExposedPattern(const std::string& word, const std::set<char>& guessed);
     void saveHistory(const std::string& username, const std::string& opponent, uint8_t result, const std::string& summary);
+    void saveHistoryWithScores(const std::string& username, const std::string& opponent, 
+                               uint8_t result, uint32_t r1Score, uint32_t r2Score, uint32_t r3Score);
 };
 
 } // namespace hangman
